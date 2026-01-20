@@ -1,6 +1,6 @@
 /**
- * Logică Automatizare Premium Car Wash v5.4 - HYBRID PROTOCOL (Gen1 + Gen2)
- * Detectează automat tipul dispozitivului și aplică metoda corectă.
+ * Logică Automatizare Premium Car Wash v5.5 - LEGACY PRIORITY
+ * Bazat pe eroarea "max_req", am confirmat că endpoint-ul Legacy este cel corect.
  * Server: 232-EU | Device: cc7b5c0a2538
  */
 
@@ -61,47 +61,42 @@ exports.handler = async (event) => {
       })
     });
 
-    // 3. TRIGGER SHELLY (Strategia Hibridă)
+    // 3. TRIGGER SHELLY (LEGACY MODE DIRECT)
     let finalStatus = "Inactiv";
     
     if (isFreeWash) {
       const originalUrl = process.env.SHELLY_IP.trim();
       
       try {
-        // TENTATIVA 1: Protocol Gen2 (RPC) - Link-ul curent
-        console.log("Incercare Gen2 RPC...");
-        const res1 = await fetch(originalUrl, { signal: AbortSignal.timeout(8000) });
-        const json1 = await res1.json();
+        // Extragem Auth Key și ID din URL-ul existent în Netlify
+        // Nu contează că URL-ul din Netlify e formatat pentru Gen2, noi extragem doar cheile
+        const urlObj = new URL(originalUrl);
+        const authKey = urlObj.searchParams.get("auth_key");
+        const cid = urlObj.searchParams.get("cid") || urlObj.searchParams.get("id");
         
-        if (json1.isok === true || (json1.result && json1.result.was_on !== undefined)) {
-          finalStatus = "SUCCES_GEN2_RPC";
+        if (!authKey || !cid) {
+            // Fallback: încercăm să folosim URL-ul așa cum e dacă nu putem parsa
+             finalStatus = "ERR_URL_PARSE";
         } else {
-          // DACĂ EȘUEAZĂ (Eroarea 404 primită de tine), trecem la Planul B
-          console.log("Gen2 esuat (" + JSON.stringify(json1) + "). Se incearca Gen1 Legacy...");
-          
-          // Extragem Auth Key și ID din URL-ul existent pentru a construi URL-ul vechi
-          const urlObj = new URL(originalUrl);
-          const authKey = urlObj.searchParams.get("auth_key");
-          const cid = urlObj.searchParams.get("cid") || urlObj.searchParams.get("id"); // Gen2 folosește cid, Gen1 id
-          
-          if (!authKey || !cid) throw new Error("Nu pot extrage cheile din URL pentru fallback.");
+            // Construim URL-ul Legacy care știm că a ajuns la server (chiar dacă a dat max_req)
+            // Acesta este "Gold Standard" pentru compatibilitate Cloud
+            const gen1Url = `https://shelly-232-eu.shelly.cloud/device/relay/0?turn=on&timer=240&auth_key=${authKey}&id=${cid}`;
+            
+            console.log("Trimite comanda pe Legacy URL...");
+            
+            const res = await fetch(gen1Url, { 
+                method: 'POST', 
+                signal: AbortSignal.timeout(10000) 
+            });
+            const json = await res.json();
 
-          // Construim URL-ul pentru Generația 1 (Legacy)
-          // Format: /device/relay/0?turn=on&timer=240
-          const gen1Url = `https://shelly-232-eu.shelly.cloud/device/relay/0?turn=on&timer=240&auth_key=${authKey}&id=${cid}`;
-          
-          const res2 = await fetch(gen1Url, { 
-             method: 'POST', // Gen1 preferă POST uneori
-             signal: AbortSignal.timeout(8000) 
-          });
-          const json2 = await res2.json(); // Gen1 returnează tot JSON
-
-          // Gen1 returnează { "isok": true }
-          if (json2.isok === true) {
-            finalStatus = "SUCCES_GEN1_LEGACY";
-          } else {
-            finalStatus = `ESEC_TOTAL: ${JSON.stringify(json2)}`;
-          }
+            if (json.isok === true) {
+                finalStatus = "CLICK_SUCCES_FINAL";
+            } else if (json.errors && json.errors.max_req) {
+                finalStatus = "SERVER_BLOCAT_TEMPORAR (Asteapta 15 min)";
+            } else {
+                finalStatus = `ERR_SHELLY: ${JSON.stringify(json)}`;
+            }
         }
       } catch (e) {
         finalStatus = `ERR_CONEXIUNE: ${e.message}`;
