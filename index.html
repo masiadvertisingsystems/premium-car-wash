@@ -3,315 +3,117 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>PWS Elite | Premium Membership</title>
-    
-    <!-- 1. INFRASTRUCTURA: Încărcăm uneltele necesare direct din CDN (Fără instalări, Fără Build) -->
+    <title>TEST CLICK | Premium Car Wash</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <!-- Babel Standalone pentru a compila JSX în browser -->
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <!-- Lucide Icons -->
-    <script src="https://unpkg.com/lucide@latest"></script>
-    
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@600;900&family=Plus+Jakarta+Sans:wght@400;500;700&display=swap" rel="stylesheet">
-
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
-        body { 
-            background-color: #050505; 
-            color: white; 
-            font-family: 'Plus Jakarta Sans', sans-serif; 
-            margin: 0;
-            overflow-x: hidden;
-            -webkit-tap-highlight-color: transparent;
-        }
-        .luxury-bg {
-            background: radial-gradient(circle at 50% -20%, #064e3b 0%, #000 80%);
-            min-height: 100vh;
-        }
-        .glass {
-            background: rgba(255, 255, 255, 0.02);
-            backdrop-filter: blur(25px);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-        }
-        .font-outfit { font-family: 'Outfit', sans-serif; }
-        
-        @keyframes pulse-emerald {
-            0%, 100% { transform: scale(1); opacity: 1; }
-            50% { transform: scale(1.2); opacity: 0.5; }
-        }
-        .status-active {
-            animation: pulse-emerald 2s infinite;
-            box-shadow: 0 0 15px rgba(16, 185, 129, 0.4);
-        }
-        
-        input::placeholder { color: rgba(255, 255, 255, 0.15); }
+        body { background-color: #0f172a; color: white; font-family: sans-serif; }
+        .test-card { background: rgba(30, 41, 59, 0.5); border: 1px solid #334155; }
+        .active-stamp { background-color: #0ea5e9; box-shadow: 0 0 15px #0ea5e9; }
     </style>
 </head>
-<body>
-    <div id="root"></div>
+<body class="min-h-screen flex flex-col items-center justify-center p-6">
 
-    <!-- 2. LOGICA DE BUSINESS (React + Firebase) -->
-    <!-- FIX: data-type="module" previne eroarea 'require is not defined' -->
-    <script type="text/babel" data-type="module">
-        const { useState, useEffect } = React;
+    <div class="w-full max-w-md text-center mb-8">
+        <h1 class="text-3xl font-black uppercase leading-none text-white">
+            AI O SPĂLARE <span class="text-sky-500 italic">GRATUITĂ!</span>
+        </h1>
+        <p class="text-slate-400 font-bold mt-2 tracking-widest text-sm">
+            SCANEAZĂ ACUM ȘI PROFITĂ!
+        </p>
+    </div>
 
-        // Configurația Firebase - Sincronizată cu regiunea EUROPE-WEST3 (Frankfurt)
-        const firebaseConfig = {
-            apiKey: "AIzaSyDlzoN9-l_Gvk3ZV2sERlRNQux5QdoSYi4",
-            authDomain: "premium-car-wash-systems.firebaseapp.com",
-            projectId: "premium-car-wash-systems",
-            storageBucket: "premium-car-wash-systems.appspot.com",
-            messagingSenderId: "1066804021666",
-            appId: "1:1066804021666:web:9494cf947ea14502758afb",
-            databaseURL: "https://premium-car-wash-systems-default-rtdb.europe-west3.firebasedatabase.app"
-        };
+    <div class="w-full max-w-md test-card rounded-3xl p-8">
+        <!-- Vizualizare Progres Test -->
+        <div class="flex justify-between mb-8 gap-2">
+            <div id="s1" class="w-full aspect-square rounded-xl border-2 border-slate-700 flex items-center justify-center">1</div>
+            <div id="s2" class="w-full aspect-square rounded-xl border-2 border-slate-700 flex items-center justify-center">2</div>
+            <div id="s3" class="w-full aspect-square rounded-xl border-2 border-slate-700 flex items-center justify-center">3</div>
+            <div id="s4" class="w-full aspect-square rounded-xl border-2 border-slate-700 flex items-center justify-center">4</div>
+            <div id="s5" class="w-full aspect-square rounded-xl border-2 border-dashed border-amber-500/50 flex items-center justify-center text-amber-500 italic">G</div>
+        </div>
 
-        // Componentă Wrapper pentru Iconițe (Lucide)
-        const Icon = ({ name, className }) => {
-            useEffect(() => {
-                if (window.lucide) window.lucide.createIcons();
-            }, [name]);
-            return <i data-lucide={name} className={className}></i>;
-        };
-
-        function App() {
-            const [view, setView] = useState('auth');
-            const [plate, setPlate] = useState('');
-            const [phone, setPhone] = useState('');
-            const [gdpr, setGdpr] = useState(false);
-            const [loading, setLoading] = useState(false);
-            const [boxStatus, setBoxStatus] = useState('Offline');
-            const [userStats, setUserStats] = useState({ visits: 0, nextIsFree: false });
+        <form id="testForm" class="space-y-4">
+            <input type="text" id="plate" placeholder="NR. ÎNMATRICULARE (ex: B01ABC)" required
+                class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-4 font-bold text-xl uppercase outline-none focus:border-sky-500">
             
-            // Stocăm modulele Firebase încărcate dinamic
-            const [modules, setModules] = useState(null);
+            <input type="tel" id="phone" placeholder="TELEFON (ex: 0722...)" required
+                class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-4 font-bold outline-none focus:border-sky-500">
 
-            useEffect(() => {
-                const initFirebase = async () => {
-                    try {
-                        // Importăm modulele Firebase direct din URL (ESM via CDN) pentru compatibilitate maximă
-                        const { initializeApp } = await import("https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js");
-                        const { getFirestore, collection, addDoc, query, where, getDocs, serverTimestamp, doc, updateDoc } = await import("https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js");
-                        const { getDatabase, ref, set, onValue } = await import("https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js");
-                        const { getAuth, signInAnonymously } = await import("https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js");
+            <button type="submit" id="btn" class="w-full bg-white text-black font-black py-5 rounded-xl text-xl hover:bg-sky-500 transition-colors uppercase">
+                Activează Vizita
+            </button>
+        </form>
 
-                        const app = initializeApp(firebaseConfig);
-                        const db = getFirestore(app);
-                        const rtdb = getDatabase(app);
-                        const auth = getAuth(app);
+        <div id="status" class="mt-6 text-center font-bold text-sm min-h-[1.5rem]"></div>
+    </div>
 
-                        setModules({ db, collection, addDoc, query, where, getDocs, serverTimestamp, rtdb, ref, set, onValue });
+    <script>
+        const form = document.getElementById('testForm');
+        const btn = document.getElementById('btn');
+        const status = document.getElementById('status');
 
-                        // Autentificare Anonimă pentru a accesa baza de date
-                        await signInAnonymously(auth);
-                        
-                        // Monitorizare Status Shelly Uni (Heartbeat din Frankfurt)
-                        onValue(ref(rtdb, 'logs/OLT_BOX_01/last_action'), (snapshot) => {
-                            if (snapshot.exists()) {
-                                const lastAction = snapshot.val();
-                                // Toleranță de 65 secunde pentru status Online
-                                const isOnline = Math.abs(Date.now() - lastAction) < 65000;
-                                setBoxStatus(isOnline ? 'Online' : 'Offline');
-                            }
-                        });
-                    } catch (error) {
-                        console.error("Eroare inițializare Firebase:", error);
-                    }
-                };
-                initFirebase();
-            }, []);
+        form.onsubmit = async (e) => {
+            e.preventDefault();
+            btn.disabled = true;
+            btn.innerText = "SE PROCESEAZĂ...";
+            status.innerText = "";
 
-            const handleLogin = async (e) => {
-                e.preventDefault();
-                if (!plate.trim() || !phone.trim() || !gdpr || !modules) return;
-
-                setLoading(true);
-                const cleanPlate = plate.toUpperCase().replace(/\s/g, '');
-                
-                try {
-                    const q = modules.query(
-                        modules.collection(modules.db, 'comenzi_spalare'),
-                        modules.where("numarInmatriculare", "==", cleanPlate),
-                        modules.where("status", "==", "completed")
-                    );
-                    const snap = await modules.getDocs(q);
-                    const count = snap.size % 5;
-                    setUserStats({ visits: count, nextIsFree: count === 4 });
-                    setView('dashboard');
-                } catch (err) {
-                    console.error("Eroare Firestore:", err);
-                } finally {
-                    setLoading(false);
-                }
+            const payload = {
+                nr_inmatriculare: document.getElementById('plate').value.trim(),
+                telefon: document.getElementById('phone').value.trim()
             };
 
-            const sendPulse = async (count) => {
-                if (!modules) return;
-                setLoading(true);
-                try {
-                    // Trigerare Shelly Uni prin RTDB (Brațul Robotic)
-                    await modules.set(modules.ref(modules.rtdb, 'control/OLT_BOX_01/inject_tokens'), count);
+            try {
+                // Trimitem catre functia de test din Netlify
+                const res = await fetch('/api/pulse', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await res.json();
+
+                if (data.status === 'success') {
+                    updateUI(data.activeStamps, data.isFreeWash);
                     
-                    if (count === 4) {
-                        // Înregistrare vizită bonus în Firestore (Creierul CRM)
-                        await modules.addDoc(modules.collection(modules.db, 'comenzi_spalare'), {
-                            numarInmatriculare: plate.toUpperCase().replace(/\s/g, ''),
-                            telefon: phone,
-                            timestamp: modules.serverTimestamp(),
-                            status: "completed",
-                            type: "loyalty_bonus"
-                        });
-                        setTimeout(() => setView('success'), 800);
+                    if(data.isFreeWash) {
+                        status.innerHTML = `<span class="text-amber-500 uppercase">🔥 CLICK ACTIVAT! STATUS: ${data.shellyStatus}</span>`;
+                    } else {
+                        status.innerHTML = `<span class="text-sky-400">VIZITA ${data.activeStamps}/5 ÎNREGISTRATĂ</span>`;
                     }
-                } catch (err) {
-                    console.error("Eroare Shelly Trigger:", err);
-                } finally {
-                    setLoading(false);
+                } else {
+                    status.innerHTML = `<span class="text-red-500">EROARE: ${data.error || 'Necunoscută'}</span>`;
                 }
-            };
+            } catch (err) {
+                status.innerHTML = `<span class="text-red-500">CONEXIUNE EȘUATĂ (NETLIFY/FIREBASE)</span>`;
+            } finally {
+                btn.disabled = false;
+                btn.innerText = "Activează Vizita";
+            }
+        };
 
-            return (
-                <div className="luxury-bg flex flex-col items-center min-h-screen">
-                    {/* Navbar */}
-                    <nav className="relative z-10 p-6 flex justify-between items-center max-w-md mx-auto w-full">
-                        <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-emerald-500 rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-500/20">
-                                <Icon name="zap" className="text-black w-6 h-6 fill-current" />
-                            </div>
-                            <div className="flex flex-col">
-                                <span className="font-black italic text-xl leading-none font-outfit uppercase tracking-tighter">PWS <span className="text-emerald-500">Olt</span></span>
-                                <span className="text-[7px] font-bold text-white/20 uppercase tracking-[0.4em] mt-1 italic leading-none">Elite Membership</span>
-                            </div>
-                        </div>
-                        <div className="flex items-center gap-2 px-3 py-1.5 glass rounded-full">
-                            <div className={`w-1.5 h-1.5 rounded-full ${boxStatus === 'Online' ? 'bg-emerald-500 status-active' : 'bg-red-600'}`} />
-                            <span className="text-[8px] font-black uppercase tracking-widest text-white/40 italic">{boxStatus}</span>
-                        </div>
-                    </nav>
+        function updateUI(stamps, isFree) {
+            // Curatam tot
+            for(let i=1; i<=4; i++) {
+                document.getElementById(`s${i}`).classList.remove('active-stamp', 'border-sky-500');
+                document.getElementById(`s${i}`).innerText = i;
+            }
+            document.getElementById('s5').classList.remove('bg-amber-500', 'text-black');
 
-                    {/* Conținut Principal */}
-                    <main className="relative z-10 max-w-md mx-auto px-8 flex-1 flex flex-col justify-center w-full space-y-8 pb-12">
-                        {view === 'auth' && (
-                            <div className="space-y-10 animate-in fade-in slide-in-from-bottom-8 duration-700">
-                                <div className="text-center">
-                                    <h2 className="text-6xl font-black italic tracking-tighter uppercase leading-[0.85] font-outfit">SPALĂ <br /> <span className="text-emerald-500 text-7xl font-black italic">GRATIS</span></h2>
-                                    <p className="text-[9px] font-bold text-white/20 uppercase tracking-[0.4em] mt-6 italic">Fidelizare Drăgănești-Olt</p>
-                                </div>
-                                
-                                <form onSubmit={handleLogin} className="space-y-4">
-                                    <div className="relative">
-                                        <Icon name="car" className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-white/10" />
-                                        <input 
-                                            required 
-                                            placeholder="NR. ÎNMATRICULARE" 
-                                            className="w-full bg-white/5 border border-white/10 rounded-[28px] py-6 pl-14 pr-6 text-xl font-bold tracking-widest outline-none focus:border-emerald-500/50 transition-all uppercase placeholder:text-white/5"
-                                            value={plate} 
-                                            onChange={e => setPlate(e.target.value)} 
-                                        />
-                                    </div>
-                                    <div className="relative">
-                                        <Icon name="phone" className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-white/10" />
-                                        <input 
-                                            required 
-                                            type="tel"
-                                            placeholder="07XX XXX XXX" 
-                                            className="w-full bg-white/5 border border-white/10 rounded-[28px] py-6 pl-14 pr-6 text-xl font-bold outline-none focus:border-emerald-500/50 transition-all placeholder:text-white/5"
-                                            value={phone} 
-                                            onChange={e => setPhone(e.target.value)} 
-                                        />
-                                    </div>
+            // Aplicam progresul
+            for(let i=1; i<=stamps; i++) {
+                const el = document.getElementById(`s${i}`);
+                el.classList.add('active-stamp', 'border-sky-500');
+                el.innerText = "✓";
+            }
 
-                                    <div className="flex items-start gap-3 px-4 py-2 cursor-pointer group" onClick={() => setGdpr(!gdpr)}>
-                                        <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-all ${gdpr ? 'bg-emerald-500 border-emerald-500' : 'border-white/10 group-hover:border-white/30'}`}>
-                                            {gdpr && <Icon name="check" className="text-black w-4 h-4" />}
-                                        </div>
-                                        <p className="text-[9px] text-white/20 font-medium leading-tight italic uppercase tracking-wider">Sunt de acord cu prelucrarea datelor pentru bonusuri prin WhatsApp.</p>
-                                    </div>
-
-                                    <button disabled={loading} className="w-full bg-white text-black py-7 rounded-[32px] font-black uppercase text-[11px] tracking-widest shadow-2xl active:scale-95 transition-all hover:bg-emerald-500 disabled:opacity-50">
-                                        {loading ? "SE CONECTEAZĂ..." : "DESCHIDE CARDUL MEU"}
-                                    </button>
-                                </form>
-                            </div>
-                        )}
-
-                        {view === 'dashboard' && (
-                            <div className="space-y-6 animate-in zoom-in-95 duration-500">
-                                <div className="glass rounded-[48px] p-10 space-y-8 relative overflow-hidden shadow-2xl text-center">
-                                    <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 blur-3xl rounded-full" />
-                                    <div className="relative z-10">
-                                        <p className="text-[10px] font-black text-emerald-500 uppercase italic tracking-widest">Membru Elite</p>
-                                        <h3 className="text-4xl font-black italic tracking-tighter uppercase font-outfit">{plate.toUpperCase()}</h3>
-                                    </div>
-
-                                    <div className="space-y-4 relative z-10">
-                                        <div className="flex justify-between text-[10px] font-black uppercase text-white/30 tracking-widest italic">
-                                            <span>Vizite Înregistrate</span>
-                                            <span>{userStats.visits} / 5</span>
-                                        </div>
-                                        <div className="h-4 bg-white/5 rounded-full overflow-hidden border border-white/10 p-1 shadow-inner">
-                                            <div 
-                                                className="h-full bg-emerald-500 rounded-full transition-all duration-1000 shadow-[0_0_15px_rgba(16,185,129,0.5)]" 
-                                                style={{ width: `${(userStats.visits / 5) * 100}%` }} 
-                                            />
-                                        </div>
-                                    </div>
-
-                                    <div className="pt-6 space-y-4 relative z-10 border-t border-white/5">
-                                       <button 
-                                        onClick={() => sendPulse(1)} 
-                                        className="w-full py-5 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center gap-3 active:scale-95 transition-all hover:bg-white/10"
-                                       >
-                                         <Icon name="settings-2" className="w-4 h-4 text-white/40" />
-                                         <span className="text-[10px] font-black uppercase text-white/40 tracking-widest italic leading-none">Test Hardware (1 Click)</span>
-                                       </button>
-
-                                       <button 
-                                        onClick={() => sendPulse(4)} 
-                                        disabled={!userStats.nextIsFree || loading} 
-                                        className={`w-full py-8 rounded-[32px] font-black uppercase text-[11px] tracking-[0.3em] transition-all shadow-2xl ${
-                                          userStats.nextIsFree 
-                                          ? 'bg-emerald-500 text-black animate-pulse shadow-emerald-500/40' 
-                                          : 'bg-white/5 text-white/10 border border-white/5 cursor-not-allowed opacity-40'
-                                        }`}
-                                       >
-                                         {userStats.nextIsFree ? "ACTIVEAZĂ BONUSUL GRATUIT!" : `MAI AI NEVOIE DE ${4 - userStats.visits} VIZITE`}
-                                       </button>
-                                    </div>
-                                </div>
-                                <button onClick={() => setView('auth')} className="w-full text-[10px] font-black text-white/20 uppercase tracking-[0.4em] flex items-center justify-center gap-2 hover:text-white transition-colors">
-                                    <Icon name="refresh-cw" className="w-3 h-3" /> Schimbă Mașina
-                                </button>
-                            </div>
-                        )}
-
-                        {view === 'success' && (
-                            <div className="text-center space-y-10 animate-in fade-in zoom-in-90 duration-500">
-                               <div className="relative mx-auto w-32 h-32 flex items-center justify-center">
-                                  <div className="absolute inset-0 bg-emerald-500/20 rounded-[45px] animate-ping" />
-                                  <div className="relative w-32 h-32 bg-emerald-500 rounded-[45px] flex items-center justify-center shadow-[0_0_50px_rgba(16,185,129,0.4)]">
-                                    <Icon name="check-circle-2" className="text-black w-16 h-16" />
-                                  </div>
-                               </div>
-                               <div className="space-y-4">
-                                  <h2 className="text-6xl font-black italic uppercase tracking-tighter leading-none font-outfit">SEMNAL<br/>TRIMIS!</h2>
-                                  <p className="text-white/40 text-xs font-medium italic">Boxa a fost alimentată. Spor la spălat!</p>
-                               </div>
-                               <button onClick={() => setView('auth')} className="bg-white/5 border border-white/10 px-10 py-5 rounded-full text-[10px] font-black uppercase italic tracking-widest active:scale-95 transition-all hover:bg-white/10">Înapoi</button>
-                            </div>
-                        )}
-                    </main>
-
-                    <footer className="py-8 text-center opacity-10 pointer-events-none mt-auto">
-                        <p className="text-[7px] font-black uppercase tracking-[0.6em]">Premium Wash Systems • Olt Division</p>
-                    </footer>
-                </div>
-            );
+            if(isFree) {
+                const s5 = document.getElementById('s5');
+                s5.classList.add('bg-amber-500', 'text-black', 'border-none');
+                s5.innerText = "FREE";
+            }
         }
-
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
     </script>
 </body>
 </html>
