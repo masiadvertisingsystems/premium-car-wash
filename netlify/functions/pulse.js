@@ -1,7 +1,6 @@
 /**
- * Logică Automatizare Premium Car Wash v4.4
- * FIX: Status undefined + Diagnostic detaliat Shelly
- * Server: 232-EU | Device: CC7B5C0A2538
+ * Logică Automatizare Premium Car Wash v4.5 - ELIMINARE UNDEFINED
+ * Sincronizare totală Frontend-Backend pentru Server 232-EU
  */
 
 const fetch = require('node-fetch');
@@ -20,7 +19,10 @@ exports.handler = async (event) => {
     const { telefon, nr_inmatriculare } = JSON.parse(event.body);
     const plateId = nr_inmatriculare.toUpperCase().replace(/\s+/g, '');
     
-    if (!process.env.FIREBASE_CONFIG) throw new Error("Configuratia FIREBASE_CONFIG lipseste!");
+    // Verificare critică a mediului
+    if (!process.env.FIREBASE_CONFIG) throw new Error("FIREBASE_CONFIG lipsește!");
+    if (!process.env.SHELLY_IP) throw new Error("Variabila SHELLY_IP nu este setată în Netlify!");
+
     const fbConfig = JSON.parse(process.env.FIREBASE_CONFIG);
     const projectId = fbConfig.projectId;
 
@@ -63,33 +65,27 @@ exports.handler = async (event) => {
     });
 
     // 3. TRIGGER SHELLY (Logica celor 4 jetoane)
-    let hardwareStatus = "Inactiv";
+    let finalStatus = "Inactiv";
     
     if (isFreeWash) {
       const shellyUrl = process.env.SHELLY_IP;
       
-      if (shellyUrl && shellyUrl.includes("http")) {
-        try {
-          // Timeout scurt pentru a nu bloca functia
-          const shellyRes = await fetch(shellyUrl, { timeout: 8000 });
-          
-          if (shellyRes.ok) {
-            hardwareStatus = "SUCCES_CLOUD_240S";
-          } else {
-            const errorText = await shellyRes.text();
-            hardwareStatus = `EROARE_CLOUD_${shellyRes.status}`;
-            console.error("Shelly API Error:", errorText);
-          }
-        } catch (e) {
-          hardwareStatus = "EROARE_CONEXIUNE_SHELLY";
-          console.error("Fetch Error:", e.message);
+      try {
+        const shellyRes = await fetch(shellyUrl, { timeout: 9000 });
+        
+        if (shellyRes.ok) {
+          finalStatus = "SUCCES_CLOUD_240S";
+        } else {
+          const errorBody = await shellyRes.text();
+          finalStatus = `EROARE_CLOUD_${shellyRes.status}`;
+          console.error("Detaliu Eroare Shelly:", errorBody);
         }
-      } else {
-        hardwareStatus = "URL_SHELLY_INVALID_SAU_LIPSUR";
+      } catch (e) {
+        finalStatus = "TIMEOUT_SAU_SHELLY_OFFLINE";
       }
     }
 
-    // Returnam intotdeauna debug ca string pentru a evita 'undefined' in UI
+    // Trimitem toate cheile posibile (debug, shellyStatus) pentru a evita 'undefined' indiferent de versiunea index.html
     return {
       statusCode: 200,
       headers,
@@ -98,19 +94,21 @@ exports.handler = async (event) => {
         activeStamps, 
         isFreeWash, 
         message: isFreeWash ? "SPĂLARE GRATUITĂ ACTIVATĂ!" : `VIZITA ${activeStamps}/5 CONFIRMATĂ.`,
-        debug: String(hardwareStatus)
+        shellyStatus: String(finalStatus), // Pentru versiuni vechi de index.html
+        debug: String(finalStatus)         // Pentru versiuni noi
       })
     };
 
   } catch (error) {
-    console.error("Crash Function:", error.message);
+    console.error("Crash:", error.message);
     return { 
       statusCode: 500, 
       headers, 
       body: JSON.stringify({ 
         status: "error", 
         error: error.message, 
-        debug: "CRASH_SERVER" 
+        shellyStatus: "CRASH_SERVER",
+        debug: "CRASH_SERVER"
       }) 
     };
   }
