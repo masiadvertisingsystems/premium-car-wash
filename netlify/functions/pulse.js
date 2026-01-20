@@ -1,6 +1,6 @@
 /**
- * Logică Automatizare Premium Car Wash v5.0 - GEN2 RPC NATIVE
- * Optimizat pentru Node.js 18+ (Fără node-fetch, fără erori de compilare)
+ * Logică Automatizare Premium Car Wash v5.1 - ULTIMATE RPC DEBUG
+ * Optimizat pentru Node.js 18+ (Fără biblioteci externe)
  * Server: 232-EU | Device: cc7b5c0a2538
  */
 
@@ -25,7 +25,7 @@ exports.handler = async (event) => {
     const projectId = fbConfig.projectId;
     const fbUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/artifacts/premium-car-wash/public/data/loyalty/${plateId}`;
 
-    // 1. FIREBASE: Citire Status (Native Fetch)
+    // 1. FIREBASE: Citire Status
     const getRes = await fetch(fbUrl);
     const userData = await getRes.json();
     
@@ -61,24 +61,25 @@ exports.handler = async (event) => {
       })
     });
 
-    // 3. TRIGGER SHELLY (Protocol Gen2 RPC)
+    // 3. TRIGGER SHELLY (Protocol Gen2 RPC cu Debug avansat)
     let finalStatus = "Inactiv";
     
     if (isFreeWash) {
       const shellyBaseUrl = process.env.SHELLY_IP.trim();
       try {
-        // Pentru Gen2 (Plus Uni), URL-ul trebuie să conțină method și params ca query
         const shellyRes = await fetch(shellyBaseUrl, { 
             method: 'GET',
             signal: AbortSignal.timeout(12000) 
         });
+        
         const resJson = await shellyRes.json();
         
-        // Shelly Gen2 returnează un obiect care conține 'result' sau 'isok'
-        if (resJson.isok === true || resJson.result !== undefined) {
+        // Verificăm succesul în ambele formate (isok sau result)
+        if (resJson.isok === true || (resJson.result && resJson.result.was_on !== undefined)) {
           finalStatus = "CLICK_SUCCES_GEN2";
         } else {
-          finalStatus = `ERR_SHELLY_RESP: ${JSON.stringify(resJson.errors || resJson)}`;
+          // Dacă e eroare, trimitem obiectul de eroare întreg pentru diagnostic
+          finalStatus = `ERR_SHELLY_404_FIX_NEEDED: ${JSON.stringify(resJson)}`;
         }
       } catch (e) {
         finalStatus = `FETCH_ERROR: ${e.message}`;
