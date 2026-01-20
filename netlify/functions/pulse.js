@@ -1,7 +1,7 @@
 /**
- * Logică Automatizare Premium Car Wash v6.0 - GEN2 DUAL CHANNEL
- * Strategie: POST RPC pe Channel 0 și Channel 1
- * Server: 232-EU | Device: cc7b5c0a2538
+ * Logică Automatizare Premium Car Wash v6.1 - PRODUCTION READY
+ * Strategie: Single Precision Shot (Evită max_req)
+ * Status: CONFIGURATIE CONFIRMATA (max_req a dovedit conexiunea)
  */
 
 exports.handler = async (event) => {
@@ -62,14 +62,13 @@ exports.handler = async (event) => {
       })
     });
 
-    // 3. TRIGGER SHELLY (Strategie POST Multi-Channel)
+    // 3. TRIGGER SHELLY (Single Shot - Production Mode)
     let finalStatus = "Inactiv";
     
     if (isFreeWash) {
       const originalUrl = process.env.SHELLY_IP.trim();
       
       try {
-        // Extragem cheile din variabila de mediu
         const urlObj = new URL(originalUrl);
         const authKey = urlObj.searchParams.get("auth_key");
         const cid = urlObj.searchParams.get("cid") || urlObj.searchParams.get("id");
@@ -80,43 +79,24 @@ exports.handler = async (event) => {
         } else {
             const rpcUrl = `${serverOrigin}/device/rpc`;
             
-            // Funcție Helper pentru a trimite comanda pe un anumit canal ID
-            const triggerShelly = async (channelId) => {
-                const params = new URLSearchParams();
-                params.append('auth_key', authKey);
-                params.append('id', cid);
-                params.append('method', 'Switch.Set');
-                params.append('params', JSON.stringify({ id: channelId, on: true, toggle_after: 240 }));
+            // Trimitem O SINGURĂ cerere pe Canalul 0 (Standard)
+            // Aceasta previne eroarea 'max_req' în viitor
+            const params = new URLSearchParams();
+            params.append('auth_key', authKey);
+            params.append('id', cid);
+            params.append('method', 'Switch.Set');
+            params.append('params', JSON.stringify({ id: 0, on: true, toggle_after: 240 }));
 
-                const res = await fetch(rpcUrl, { method: 'POST', body: params });
-                return await res.json();
-            };
-
-            // ÎNCERCARE CANAL 0
-            console.log("Încercare Channel 0...");
-            let json = await triggerShelly(0);
+            console.log("Executare Single-Shot RPC...");
+            const res = await fetch(rpcUrl, { method: 'POST', body: params });
+            const json = await res.json();
 
             if (json.isok === true || (json.result && json.result.was_on !== undefined)) {
-                finalStatus = "SUCCES_CHANNEL_0";
+                finalStatus = "SUCCES_HARDWARE_ACTIVAT";
+            } else if (json.errors && json.errors.max_req) {
+                 finalStatus = "SERVER_BLOCAT_TEMPORAR (Asteapta 15 min)";
             } else {
-                // ÎNCERCARE CANAL 1 (Fallback dacă Ch 0 eșuează)
-                console.log(`Channel 0 eșuat (${JSON.stringify(json)}). Încercare Channel 1...`);
-                json = await triggerShelly(1);
-                
-                if (json.isok === true || (json.result && json.result.was_on !== undefined)) {
-                    finalStatus = "SUCCES_CHANNEL_1";
-                } else {
-                    // DIAGNOSTIC FINAL: Verificăm statusul general
-                    const statusParams = new URLSearchParams();
-                    statusParams.append('auth_key', authKey);
-                    statusParams.append('id', cid);
-                    statusParams.append('method', 'Shelly.GetStatus');
-                    
-                    const statusRes = await fetch(rpcUrl, { method: 'POST', body: statusParams });
-                    const statusJson = await statusRes.json();
-                    
-                    finalStatus = `ESEC_TOTAL: ${JSON.stringify(json)} | STATUS_DEV: ${JSON.stringify(statusJson).substring(0, 100)}`;
-                }
+                finalStatus = `ERR_SHELLY: ${JSON.stringify(json)}`;
             }
         }
       } catch (e) {
