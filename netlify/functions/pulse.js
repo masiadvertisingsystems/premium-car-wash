@@ -1,6 +1,6 @@
 /**
- * Logică Automatizare Premium Car Wash v5.6 - GEN2 NATIVE POST
- * Metoda: POST RPC (Standard Industrial pentru Shelly Plus/Pro)
+ * Logică Automatizare Premium Car Wash v5.7 - LEGACY FORCE
+ * Metoda: POST Legacy (Bazat pe dovada "max_req" anterioară)
  * Server: 232-EU | Device: cc7b5c0a2538
  */
 
@@ -61,37 +61,35 @@ exports.handler = async (event) => {
       })
     });
 
-    // 3. TRIGGER SHELLY (GEN2 POST RPC)
+    // 3. TRIGGER SHELLY (LEGACY POST FORCE)
     let finalStatus = "Inactiv";
     
     if (isFreeWash) {
       const originalUrl = process.env.SHELLY_IP.trim();
       
       try {
-        // Parsăm URL-ul din Netlify pentru a extrage cheile, indiferent de formatul vechi
+        // Extragem cheile din URL-ul din Netlify
         const urlObj = new URL(originalUrl);
         const authKey = urlObj.searchParams.get("auth_key");
-        // Gen2 acceptă 'cid' sau 'id'. Extragem ce găsim.
         const cid = urlObj.searchParams.get("cid") || urlObj.searchParams.get("id");
-        const serverOrigin = urlObj.origin; // ex: https://shelly-232-eu.shelly.cloud
+        const serverOrigin = urlObj.origin; 
 
         if (!authKey || !cid) {
-           finalStatus = "ERR_CHEI_LIPSA_IN_URL";
+           finalStatus = "ERR_CHEI_LIPSA";
         } else {
-            // Construim cererea POST standard pentru Gen2
-            // Endpoint: /device/rpc
-            // Body: id, auth_key, method, params (form-urlencoded)
-            const rpcUrl = `${serverOrigin}/device/rpc`;
+            // FORȚĂM METODA LEGACY (/device/relay/0)
+            // Aceasta este singura care a returnat 'max_req' (deci a ajuns la server)
+            const legacyUrl = `${serverOrigin}/device/relay/0`;
             
             const params = new URLSearchParams();
             params.append('auth_key', authKey);
-            params.append('id', cid); // Cloud API cere parametrul 'id' în body
-            params.append('method', 'Switch.Set');
-            params.append('params', JSON.stringify({ id: 0, on: true, toggle_after: 240 }));
+            params.append('id', cid);
+            params.append('turn', 'on');
+            params.append('timer', '240'); // 4 minute
 
-            console.log(`Trimite POST RPC către ${rpcUrl} pentru ID: ${cid}`);
+            console.log(`Trimite LEGACY POST către ${legacyUrl} pentru ID: ${cid}`);
 
-            const res = await fetch(rpcUrl, {
+            const res = await fetch(legacyUrl, {
                 method: 'POST',
                 body: params,
                 signal: AbortSignal.timeout(12000)
@@ -99,11 +97,10 @@ exports.handler = async (event) => {
             
             const json = await res.json();
 
-            // Shelly Gen2 returnează { isok: true, data: {...} } sau eroare
-            if (json.isok === true || (json.result && json.result.was_on !== undefined)) {
-                finalStatus = "CLICK_SUCCES_POST";
+            if (json.isok === true) {
+                finalStatus = "CLICK_SUCCES_LEGACY";
             } else {
-                finalStatus = `ERR_SHELLY_POST: ${JSON.stringify(json)}`;
+                finalStatus = `ERR_SHELLY_LEGACY: ${JSON.stringify(json)}`;
             }
         }
       } catch (e) {
