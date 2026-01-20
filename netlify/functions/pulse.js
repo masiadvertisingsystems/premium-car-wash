@@ -1,6 +1,6 @@
 /**
- * Logică Automatizare Premium Car Wash v5.7 - LEGACY FORCE
- * Metoda: POST Legacy (Bazat pe dovada "max_req" anterioară)
+ * Logică Automatizare Premium Car Wash v5.8 - BROWSER STYLE GET
+ * Metoda: GET Legacy (Imită comportamentul browserului care a dat max_req)
  * Server: 232-EU | Device: cc7b5c0a2538
  */
 
@@ -61,14 +61,13 @@ exports.handler = async (event) => {
       })
     });
 
-    // 3. TRIGGER SHELLY (LEGACY POST FORCE)
+    // 3. TRIGGER SHELLY (GET LEGACY - Browser Style)
     let finalStatus = "Inactiv";
     
     if (isFreeWash) {
       const originalUrl = process.env.SHELLY_IP.trim();
       
       try {
-        // Extragem cheile din URL-ul din Netlify
         const urlObj = new URL(originalUrl);
         const authKey = urlObj.searchParams.get("auth_key");
         const cid = urlObj.searchParams.get("cid") || urlObj.searchParams.get("id");
@@ -77,30 +76,24 @@ exports.handler = async (event) => {
         if (!authKey || !cid) {
            finalStatus = "ERR_CHEI_LIPSA";
         } else {
-            // FORȚĂM METODA LEGACY (/device/relay/0)
-            // Aceasta este singura care a returnat 'max_req' (deci a ajuns la server)
-            const legacyUrl = `${serverOrigin}/device/relay/0`;
-            
-            const params = new URLSearchParams();
-            params.append('auth_key', authKey);
-            params.append('id', cid);
-            params.append('turn', 'on');
-            params.append('timer', '240'); // 4 minute
+            // Construim URL-ul Legacy pentru metoda GET
+            // Aceasta este metoda care a generat 'max_req' anterior, deci știm că ajunge la destinație
+            const legacyUrl = `${serverOrigin}/device/relay/0?turn=on&timer=240&auth_key=${authKey}&id=${cid}`;
 
-            console.log(`Trimite LEGACY POST către ${legacyUrl} pentru ID: ${cid}`);
+            console.log(`Trimite LEGACY GET către ${legacyUrl}`);
 
+            // Folosim GET, nu POST (exact ca atunci când pui linkul în browser)
             const res = await fetch(legacyUrl, {
-                method: 'POST',
-                body: params,
+                method: 'GET',
                 signal: AbortSignal.timeout(12000)
             });
             
             const json = await res.json();
 
             if (json.isok === true) {
-                finalStatus = "CLICK_SUCCES_LEGACY";
+                finalStatus = "CLICK_SUCCES_GET";
             } else {
-                finalStatus = `ERR_SHELLY_LEGACY: ${JSON.stringify(json)}`;
+                finalStatus = `ERR_SHELLY_GET: ${JSON.stringify(json)}`;
             }
         }
       } catch (e) {
