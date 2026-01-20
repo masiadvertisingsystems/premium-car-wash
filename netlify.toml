@@ -1,0 +1,19 @@
+# Netlify Configuration File
+
+[build]
+  # The folder where your functions are located
+  functions = "netlify/functions"
+  
+  # The directory to publish (current directory)
+  publish = "."
+
+# Optional: Redirects to make calling the function easier
+# This allows you to call /api/pulse instead of /.netlify/functions/pulse
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/:splat"
+  status = 200
+
+[functions]
+  # Increase timeout or change node version if needed
+  node_bundle = true
