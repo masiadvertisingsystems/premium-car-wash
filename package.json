@@ -1,0 +1,18 @@
+{
+  "name": "premium-car-wash-api",
+  "version": "1.1.0",
+  "description": "Backend pentru sistemul de fidelizare si automatizare Shelly Uni Plus",
+  "main": "index.js",
+  "dependencies": {
+    "firebase": "^11.1.0",
+    "node-fetch": "^2.7.0"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Masi Advertising Systems",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
