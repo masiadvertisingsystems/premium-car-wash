@@ -1,6 +1,6 @@
 /**
- * Logică Automatizare Premium Car Wash v5.8 - BROWSER STYLE GET
- * Metoda: GET Legacy (Imită comportamentul browserului care a dat max_req)
+ * Logică Automatizare Premium Car Wash v6.0 - GEN2 DUAL CHANNEL
+ * Strategie: POST RPC pe Channel 0 și Channel 1
  * Server: 232-EU | Device: cc7b5c0a2538
  */
 
@@ -18,6 +18,7 @@ exports.handler = async (event) => {
     const { telefon, nr_inmatriculare } = JSON.parse(event.body);
     const plateId = nr_inmatriculare.toUpperCase().replace(/\s+/g, '');
     
+    // Verificare Configurație
     if (!process.env.FIREBASE_CONFIG) throw new Error("FIREBASE_CONFIG missing");
     if (!process.env.SHELLY_IP) throw new Error("SHELLY_IP missing");
 
@@ -61,39 +62,61 @@ exports.handler = async (event) => {
       })
     });
 
-    // 3. TRIGGER SHELLY (GET LEGACY - Browser Style)
+    // 3. TRIGGER SHELLY (Strategie POST Multi-Channel)
     let finalStatus = "Inactiv";
     
     if (isFreeWash) {
       const originalUrl = process.env.SHELLY_IP.trim();
       
       try {
+        // Extragem cheile din variabila de mediu
         const urlObj = new URL(originalUrl);
         const authKey = urlObj.searchParams.get("auth_key");
         const cid = urlObj.searchParams.get("cid") || urlObj.searchParams.get("id");
         const serverOrigin = urlObj.origin; 
 
         if (!authKey || !cid) {
-           finalStatus = "ERR_CHEI_LIPSA";
+           finalStatus = "ERR_CHEI_LIPSA_URL";
         } else {
-            // Construim URL-ul Legacy pentru metoda GET
-            // Aceasta este metoda care a generat 'max_req' anterior, deci știm că ajunge la destinație
-            const legacyUrl = `${serverOrigin}/device/relay/0?turn=on&timer=240&auth_key=${authKey}&id=${cid}`;
-
-            console.log(`Trimite LEGACY GET către ${legacyUrl}`);
-
-            // Folosim GET, nu POST (exact ca atunci când pui linkul în browser)
-            const res = await fetch(legacyUrl, {
-                method: 'GET',
-                signal: AbortSignal.timeout(12000)
-            });
+            const rpcUrl = `${serverOrigin}/device/rpc`;
             
-            const json = await res.json();
+            // Funcție Helper pentru a trimite comanda pe un anumit canal ID
+            const triggerShelly = async (channelId) => {
+                const params = new URLSearchParams();
+                params.append('auth_key', authKey);
+                params.append('id', cid);
+                params.append('method', 'Switch.Set');
+                params.append('params', JSON.stringify({ id: channelId, on: true, toggle_after: 240 }));
 
-            if (json.isok === true) {
-                finalStatus = "CLICK_SUCCES_GET";
+                const res = await fetch(rpcUrl, { method: 'POST', body: params });
+                return await res.json();
+            };
+
+            // ÎNCERCARE CANAL 0
+            console.log("Încercare Channel 0...");
+            let json = await triggerShelly(0);
+
+            if (json.isok === true || (json.result && json.result.was_on !== undefined)) {
+                finalStatus = "SUCCES_CHANNEL_0";
             } else {
-                finalStatus = `ERR_SHELLY_GET: ${JSON.stringify(json)}`;
+                // ÎNCERCARE CANAL 1 (Fallback dacă Ch 0 eșuează)
+                console.log(`Channel 0 eșuat (${JSON.stringify(json)}). Încercare Channel 1...`);
+                json = await triggerShelly(1);
+                
+                if (json.isok === true || (json.result && json.result.was_on !== undefined)) {
+                    finalStatus = "SUCCES_CHANNEL_1";
+                } else {
+                    // DIAGNOSTIC FINAL: Verificăm statusul general
+                    const statusParams = new URLSearchParams();
+                    statusParams.append('auth_key', authKey);
+                    statusParams.append('id', cid);
+                    statusParams.append('method', 'Shelly.GetStatus');
+                    
+                    const statusRes = await fetch(rpcUrl, { method: 'POST', body: statusParams });
+                    const statusJson = await statusRes.json();
+                    
+                    finalStatus = `ESEC_TOTAL: ${JSON.stringify(json)} | STATUS_DEV: ${JSON.stringify(statusJson).substring(0, 100)}`;
+                }
             }
         }
       } catch (e) {
