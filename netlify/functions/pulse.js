@@ -1,6 +1,6 @@
 /**
- * Motor Test Click - Premium Car Wash v2.5
- * Focus: Verificarea legăturii Netlify -> Shelly Cloud
+ * Logică Automatizare Premium Car Wash v3.2 - FINAL CLICK
+ * Configurat pentru Server 232-EU | Device CC7B5C0A2538
  */
 
 const { initializeApp } = require('firebase/app');
@@ -24,36 +24,64 @@ exports.handler = async (event) => {
 
   try {
     const { telefon, nr_inmatriculare } = JSON.parse(event.body);
-    const plateId = nr_inmatriculare.toUpperCase().replace(/\s+/g, '');
-    
-    // 1. TEST FIREBASE
-    const userDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'loyalty', plateId);
-    let activeStamps = 1;
-    let isFreeWash = false;
+    if (!nr_inmatriculare) throw new Error("Lipsă număr înmatriculare");
 
+    const plateId = nr_inmatriculare.toUpperCase().replace(/\s+/g, '');
+    const userDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'loyalty', plateId);
+    
+    let activeStamps = 0;
+    let isFreeWash = false;
+    let message = "";
+    let shellyStatus = "N/A";
+
+    // 1. Accesare Firebase
     const userDoc = await getDoc(userDocRef);
     
     if (!userDoc.exists()) {
-      await setDoc(userDocRef, { telefon, nr_inmatriculare: plateId, stampile_active: 1, last_visit: new Date().toISOString() });
+      activeStamps = 1;
+      await setDoc(userDocRef, { 
+        telefon, 
+        nr_inmatriculare: plateId, 
+        stampile_active: 1, 
+        last_visit: new Date().toISOString() 
+      });
+      message = "BINE AI VENIT! AI 1/5 ȘTAMPILE.";
     } else {
-      activeStamps = (userDoc.data().stampile_active || 0) + 1;
+      const data = userDoc.data();
+      activeStamps = (data.stampile_active || 0) + 1;
+
       if (activeStamps >= 5) {
         isFreeWash = true;
-        activeStamps = 0;
-      }
-      await updateDoc(userDocRef, { stampile_active: activeStamps, last_visit: new Date().toISOString() });
-    }
+        activeStamps = 0; // Resetare card
+        message = "SPĂLARE GRATUITĂ ACTIVATĂ!";
 
-    // 2. TEST CLICK (SHELLY)
-    let shellyStatus = "Not Triggered";
-    if (isFreeWash) {
-      const shellyUrl = process.env.SHELLY_IP;
-      if (shellyUrl) {
-        const shellyRes = await fetch(shellyUrl, { method: 'GET', timeout: 8000 });
-        shellyStatus = shellyRes.ok ? "CLICK SUCCESS" : "SHELLY CLOUD ERROR";
+        // 2. EXECUTARE COMANDĂ HARDWARE
+        const shellyUrl = process.env.SHELLY_IP;
+        if (shellyUrl) {
+          try {
+            const shellyRes = await fetch(shellyUrl, { method: 'GET', timeout: 10000 });
+            const resultText = await shellyRes.text();
+            
+            if (shellyRes.ok) {
+              shellyStatus = "CLICK_SUCCES";
+            } else {
+              shellyStatus = `CLOUD_ERROR: ${shellyRes.status}`;
+              console.error("Shelly Error Detail:", resultText);
+            }
+          } catch (e) {
+            shellyStatus = "TIMEOUT_OFFLINE";
+          }
+        } else {
+          shellyStatus = "URL_MISSING_IN_NETLIFY";
+        }
       } else {
-        shellyStatus = "MISSING URL IN NETLIFY";
+        message = `VIZITĂ CONFIRMATĂ! AI ${activeStamps}/5 ȘTAMPILE.`;
       }
+
+      await updateDoc(userDocRef, { 
+        stampile_active: activeStamps, 
+        last_visit: new Date().toISOString() 
+      });
     }
 
     return {
@@ -63,12 +91,13 @@ exports.handler = async (event) => {
         status: "success", 
         activeStamps, 
         isFreeWash, 
-        shellyStatus,
-        message: isFreeWash ? "CLICK AR TREBUI SĂ SE AUZĂ!" : `Vizita ${activeStamps}/5 înregistrată.`
+        message,
+        debug: shellyStatus 
       })
     };
 
   } catch (error) {
-    return { statusCode: 500, headers, body: JSON.stringify({ error: error.message, stack: "Check Netlify Logs" }) };
+    console.error("Global Function Error:", error.message);
+    return { statusCode: 500, headers, body: JSON.stringify({ error: error.message }) };
   }
 };
