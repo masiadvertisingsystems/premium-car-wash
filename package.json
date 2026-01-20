@@ -1,10 +1,9 @@
 {
   "name": "premium-car-wash-api",
-  "version": "1.1.0",
-  "description": "Backend pentru sistemul de fidelizare si automatizare Shelly Uni Plus",
+  "version": "1.2.0",
+  "description": "Backend Ultra-Light pentru sistemul de fidelizare si automatizare Shelly Uni Plus",
   "main": "index.js",
   "dependencies": {
-    "firebase": "^11.1.0",
     "node-fetch": "^2.7.0"
   },
   "scripts": {
