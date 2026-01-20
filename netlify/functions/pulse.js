@@ -1,16 +1,10 @@
 /**
- * Logică Automatizare Premium Car Wash v3.2 - FINAL CLICK
- * Configurat pentru Server 232-EU | Device CC7B5C0A2538
+ * Logică Ultra-Stabilă Premium Car Wash v4.0
+ * Metoda: REST API (Fără dependențe grele - evită crash-urile Netlify)
+ * Server: 232-EU | Device: CC7B5C0A2538
  */
 
-const { initializeApp } = require('firebase/app');
-const { getFirestore, doc, getDoc, setDoc, updateDoc } = require('firebase/firestore');
 const fetch = require('node-fetch');
-
-const firebaseConfig = JSON.parse(process.env.FIREBASE_CONFIG || '{}');
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-const appId = "premium-car-wash";
 
 exports.handler = async (event) => {
   const headers = {
@@ -20,68 +14,85 @@ exports.handler = async (event) => {
     "Access-Control-Allow-Methods": "POST, OPTIONS"
   };
 
+  // Gestionare cereri pre-flight CORS
   if (event.httpMethod === "OPTIONS") return { statusCode: 204, headers, body: "" };
 
   try {
     const { telefon, nr_inmatriculare } = JSON.parse(event.body);
-    if (!nr_inmatriculare) throw new Error("Lipsă număr înmatriculare");
-
     const plateId = nr_inmatriculare.toUpperCase().replace(/\s+/g, '');
-    const userDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'loyalty', plateId);
+    
+    // Verificare existență configurație
+    if (!process.env.FIREBASE_CONFIG) {
+      throw new Error("Configurația FIREBASE_CONFIG lipsește din Netlify!");
+    }
+
+    const fbConfig = JSON.parse(process.env.FIREBASE_CONFIG);
+    const projectId = fbConfig.projectId;
+    
+    // Calea REST către documentul de fidelizare în Firestore
+    const fbUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/artifacts/premium-car-wash/public/data/loyalty/${plateId}`;
+
+    // 1. CITIRE DATE DIN FIREBASE (REST API)
+    const getRes = await fetch(fbUrl);
+    const userData = await getRes.json();
     
     let activeStamps = 0;
     let isFreeWash = false;
-    let message = "";
-    let shellyStatus = "N/A";
+    let method = "PATCH"; // Default pentru actualizare document existent
 
-    // 1. Accesare Firebase
-    const userDoc = await getDoc(userDocRef);
-    
-    if (!userDoc.exists()) {
+    if (userData.error && userData.error.code === 404) {
+      // CAZ: CLIENT NOU
       activeStamps = 1;
-      await setDoc(userDocRef, { 
-        telefon, 
-        nr_inmatriculare: plateId, 
-        stampile_active: 1, 
-        last_visit: new Date().toISOString() 
-      });
-      message = "BINE AI VENIT! AI 1/5 ȘTAMPILE.";
-    } else {
-      const data = userDoc.data();
-      activeStamps = (data.stampile_active || 0) + 1;
-
+      method = "POST"; // Creare document nou
+    } else if (userData.fields) {
+      // CAZ: CLIENT EXISTENT
+      const current = parseInt(userData.fields.stampile_active?.integerValue || "0");
+      activeStamps = current + 1;
+      
       if (activeStamps >= 5) {
         isFreeWash = true;
-        activeStamps = 0; // Resetare card
-        message = "SPĂLARE GRATUITĂ ACTIVATĂ!";
+        activeStamps = 0; // Resetare card după atingerea pragului
+      }
+    } else {
+      throw new Error("Eroare la citirea datelor din Firebase.");
+    }
 
-        // 2. EXECUTARE COMANDĂ HARDWARE
-        const shellyUrl = process.env.SHELLY_IP;
-        if (shellyUrl) {
-          try {
-            const shellyRes = await fetch(shellyUrl, { method: 'GET', timeout: 10000 });
-            const resultText = await shellyRes.text();
-            
-            if (shellyRes.ok) {
-              shellyStatus = "CLICK_SUCCES";
-            } else {
-              shellyStatus = `CLOUD_ERROR: ${shellyRes.status}`;
-              console.error("Shelly Error Detail:", resultText);
-            }
-          } catch (e) {
-            shellyStatus = "TIMEOUT_OFFLINE";
-          }
-        } else {
-          shellyStatus = "URL_MISSING_IN_NETLIFY";
+    // 2. SALVARE DATE ÎN FIREBASE (REST API)
+    // Pentru PATCH (update) trebuie să specificăm ce câmpuri actualizăm
+    const updateMask = "updateMask.fieldPaths=stampile_active&updateMask.fieldPaths=last_visit&updateMask.fieldPaths=telefon&updateMask.fieldPaths=nr_inmatriculare";
+    const saveUrl = (method === "PATCH") ? `${fbUrl}?${updateMask}` : fbUrl.replace(`/${plateId}`, `?documentId=${plateId}`);
+    
+    const saveRes = await fetch(saveUrl, {
+      method: method === "POST" ? "POST" : "PATCH",
+      body: JSON.stringify({
+        fields: {
+          nr_inmatriculare: { stringValue: plateId },
+          telefon: { stringValue: telefon },
+          stampile_active: { integerValue: activeStamps.toString() },
+          last_visit: { stringValue: new Date().toISOString() }
+        }
+      })
+    });
+
+    if (!saveRes.ok) {
+      const saveError = await saveRes.json();
+      throw new Error("Eroare la salvarea în Firebase: " + JSON.stringify(saveError));
+    }
+
+    // 3. TRIGGER SHELLY CLOUD (Doar dacă este a 5-a vizită)
+    let shellyLog = "Inactiv";
+    if (isFreeWash) {
+      const shellyUrl = process.env.SHELLY_IP;
+      if (shellyUrl) {
+        try {
+          const shellyRes = await fetch(shellyUrl, { method: 'GET', timeout: 8000 });
+          shellyLog = shellyRes.ok ? "CLICK_SUCCES" : `EROARE_CLOUD_${shellyRes.status}`;
+        } catch (e) {
+          shellyLog = "TIMEOUT_SHELLY_OFFLINE";
         }
       } else {
-        message = `VIZITĂ CONFIRMATĂ! AI ${activeStamps}/5 ȘTAMPILE.`;
+        shellyLog = "URL_SHELLY_LIPSESTE";
       }
-
-      await updateDoc(userDocRef, { 
-        stampile_active: activeStamps, 
-        last_visit: new Date().toISOString() 
-      });
     }
 
     return {
@@ -91,13 +102,17 @@ exports.handler = async (event) => {
         status: "success", 
         activeStamps, 
         isFreeWash, 
-        message,
-        debug: shellyStatus 
+        message: isFreeWash ? "SPĂLARE GRATUITĂ ACTIVATĂ!" : `VIZITA ${activeStamps}/5 CONFIRMATĂ.`,
+        debug: shellyLog
       })
     };
 
   } catch (error) {
-    console.error("Global Function Error:", error.message);
-    return { statusCode: 500, headers, body: JSON.stringify({ error: error.message }) };
+    console.error("Crash Function:", error.message);
+    return { 
+      statusCode: 500, 
+      headers, 
+      body: JSON.stringify({ error: "EROARE SERVER: " + error.message }) 
+    };
   }
 };
