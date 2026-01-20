@@ -1,9 +1,8 @@
 /**
- * Logică Automatizare Premium Car Wash v4.5 - ELIMINARE UNDEFINED
- * Sincronizare totală Frontend-Backend pentru Server 232-EU
+ * Logică Automatizare Premium Car Wash v5.0 - GEN2 RPC NATIVE
+ * Optimizat pentru Node.js 18+ (Fără node-fetch, fără erori de compilare)
+ * Server: 232-EU | Device: cc7b5c0a2538
  */
-
-const fetch = require('node-fetch');
 
 exports.handler = async (event) => {
   const headers = {
@@ -19,16 +18,14 @@ exports.handler = async (event) => {
     const { telefon, nr_inmatriculare } = JSON.parse(event.body);
     const plateId = nr_inmatriculare.toUpperCase().replace(/\s+/g, '');
     
-    // Verificare critică a mediului
-    if (!process.env.FIREBASE_CONFIG) throw new Error("FIREBASE_CONFIG lipsește!");
-    if (!process.env.SHELLY_IP) throw new Error("Variabila SHELLY_IP nu este setată în Netlify!");
+    if (!process.env.FIREBASE_CONFIG) throw new Error("FIREBASE_CONFIG missing");
+    if (!process.env.SHELLY_IP) throw new Error("SHELLY_IP missing");
 
     const fbConfig = JSON.parse(process.env.FIREBASE_CONFIG);
     const projectId = fbConfig.projectId;
-
     const fbUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/artifacts/premium-car-wash/public/data/loyalty/${plateId}`;
 
-    // 1. CITIRE STATUS CLIENT
+    // 1. FIREBASE: Citire Status (Native Fetch)
     const getRes = await fetch(fbUrl);
     const userData = await getRes.json();
     
@@ -39,8 +36,8 @@ exports.handler = async (event) => {
     if (userData.error && userData.error.code === 404) {
       activeStamps = 1;
       method = "POST";
-    } else {
-      const current = parseInt(userData.fields?.stampile_active?.integerValue || "0");
+    } else if (userData.fields) {
+      const current = parseInt(userData.fields.stampile_active?.integerValue || "0");
       activeStamps = current + 1;
       if (activeStamps >= 5) {
         isFreeWash = true;
@@ -48,7 +45,7 @@ exports.handler = async (event) => {
       }
     }
 
-    // 2. SALVARE ÎN FIREBASE
+    // 2. FIREBASE: Salvare
     const updateMask = "updateMask.fieldPaths=stampile_active&updateMask.fieldPaths=last_visit&updateMask.fieldPaths=telefon&updateMask.fieldPaths=nr_inmatriculare";
     const saveUrl = (method === "PATCH") ? `${fbUrl}?${updateMask}` : fbUrl.replace(`/${plateId}`, `?documentId=${plateId}`);
     
@@ -64,28 +61,30 @@ exports.handler = async (event) => {
       })
     });
 
-    // 3. TRIGGER SHELLY (Logica celor 4 jetoane)
+    // 3. TRIGGER SHELLY (Protocol Gen2 RPC)
     let finalStatus = "Inactiv";
     
     if (isFreeWash) {
-      const shellyUrl = process.env.SHELLY_IP;
-      
+      const shellyBaseUrl = process.env.SHELLY_IP.trim();
       try {
-        const shellyRes = await fetch(shellyUrl, { timeout: 9000 });
+        // Pentru Gen2 (Plus Uni), URL-ul trebuie să conțină method și params ca query
+        const shellyRes = await fetch(shellyBaseUrl, { 
+            method: 'GET',
+            signal: AbortSignal.timeout(12000) 
+        });
+        const resJson = await shellyRes.json();
         
-        if (shellyRes.ok) {
-          finalStatus = "SUCCES_CLOUD_240S";
+        // Shelly Gen2 returnează un obiect care conține 'result' sau 'isok'
+        if (resJson.isok === true || resJson.result !== undefined) {
+          finalStatus = "CLICK_SUCCES_GEN2";
         } else {
-          const errorBody = await shellyRes.text();
-          finalStatus = `EROARE_CLOUD_${shellyRes.status}`;
-          console.error("Detaliu Eroare Shelly:", errorBody);
+          finalStatus = `ERR_SHELLY_RESP: ${JSON.stringify(resJson.errors || resJson)}`;
         }
       } catch (e) {
-        finalStatus = "TIMEOUT_SAU_SHELLY_OFFLINE";
+        finalStatus = `FETCH_ERROR: ${e.message}`;
       }
     }
 
-    // Trimitem toate cheile posibile (debug, shellyStatus) pentru a evita 'undefined' indiferent de versiunea index.html
     return {
       statusCode: 200,
       headers,
@@ -94,22 +93,16 @@ exports.handler = async (event) => {
         activeStamps, 
         isFreeWash, 
         message: isFreeWash ? "SPĂLARE GRATUITĂ ACTIVATĂ!" : `VIZITA ${activeStamps}/5 CONFIRMATĂ.`,
-        shellyStatus: String(finalStatus), // Pentru versiuni vechi de index.html
-        debug: String(finalStatus)         // Pentru versiuni noi
+        shellyStatus: String(finalStatus),
+        debug: String(finalStatus)
       })
     };
 
   } catch (error) {
-    console.error("Crash:", error.message);
     return { 
       statusCode: 500, 
       headers, 
-      body: JSON.stringify({ 
-        status: "error", 
-        error: error.message, 
-        shellyStatus: "CRASH_SERVER",
-        debug: "CRASH_SERVER"
-      }) 
+      body: JSON.stringify({ status: "error", error: error.message }) 
     };
   }
 };
