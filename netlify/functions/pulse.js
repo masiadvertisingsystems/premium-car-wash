@@ -1,6 +1,6 @@
 /**
- * Logică Automatizare Premium Car Wash v6.3 - DUAL CHANNEL BREAKER
- * Strategie: Atacă Canalul 0 si Canalul 1. Dacă unul e 404, celălalt trebuie să meargă.
+ * Logică Automatizare Premium Car Wash v6.4 - LEGACY SNIPER
+ * Strategie: Folosește exclusiv metoda Legacy (/device/relay/0) care a fost validată prin eroarea max_req.
  * Server: 232-EU | Device: cc7b5c0a2538
  */
 
@@ -62,7 +62,7 @@ exports.handler = async (event) => {
       })
     });
 
-    // 3. TRIGGER SHELLY (DUAL CHANNEL ATTACK)
+    // 3. TRIGGER SHELLY (LEGACY SNIPER)
     let finalStatus = "Inactiv";
     let debugLog = "";
     
@@ -78,43 +78,32 @@ exports.handler = async (event) => {
         if (!authKey || !cid) {
            finalStatus = "ERR_CHEI_LIPSA_URL";
         } else {
-            const rpcUrl = `${serverOrigin}/device/rpc`;
+            // TINTIM DIRECT ENDPOINT-UL CARE A RASPUNS (chiar daca cu max_req)
+            const legacyUrl = `${serverOrigin}/device/relay/0`;
             
-            // Helper pentru POST RPC
-            const callRpc = async (methodName, paramsObj) => {
-                const p = new URLSearchParams();
-                p.append('auth_key', authKey);
-                p.append('id', cid);
-                p.append('method', methodName);
-                if (paramsObj) p.append('params', JSON.stringify(paramsObj));
-                
-                const r = await fetch(rpcUrl, { method: 'POST', body: p });
-                return await r.json();
-            };
+            const params = new URLSearchParams();
+            params.append('auth_key', authKey);
+            params.append('id', cid);
+            params.append('turn', 'on');
+            params.append('timer', '240'); // 4 minute
 
-            // TENTATIVA 1: Canal 0
-            console.log("Încercare Canal 0...");
-            let res0 = await callRpc('Switch.Set', { id: 0, on: true, toggle_after: 240 });
+            console.log(`Trimite LEGACY POST către ${legacyUrl}`);
+
+            // Un singur apel, curat, fara retry, pentru a nu bloca serverul
+            const res = await fetch(legacyUrl, {
+                method: 'POST',
+                body: params,
+                signal: AbortSignal.timeout(12000)
+            });
             
-            if (res0.isok === true || (res0.result && res0.result.was_on !== undefined)) {
-                finalStatus = "SUCCES_CANAL_0";
+            const json = await res.json();
+
+            if (json.isok === true) {
+                finalStatus = "SUCCES_HARDWARE_ACTIVAT";
+            } else if (json.errors && json.errors.max_req) {
+                 finalStatus = "⚠️ SERVER BLOCAT (Asteapta 15 min)";
             } else {
-                debugLog += `CH0_FAIL: ${JSON.stringify(res0)} | `;
-                
-                // TENTATIVA 2: Canal 1 (Dacă 0 eșuează)
-                console.log("Încercare Canal 1...");
-                let res1 = await callRpc('Switch.Set', { id: 1, on: true, toggle_after: 240 });
-                
-                if (res1.isok === true || (res1.result && res1.result.was_on !== undefined)) {
-                    finalStatus = "SUCCES_CANAL_1";
-                } else {
-                    debugLog += `CH1_FAIL: ${JSON.stringify(res1)} | `;
-                    
-                    // TENTATIVA 3: DIAGNOSTIC (Vedem ce metode suportă de fapt)
-                    console.log("Diagnosticare...");
-                    let resStatus = await callRpc('Shelly.GetStatus', null);
-                    finalStatus = `ESEC_TOTAL. DIAGNOSTIC: ${JSON.stringify(resStatus).substring(0, 150)}`;
-                }
+                finalStatus = `ERR_SHELLY: ${JSON.stringify(json)}`;
             }
         }
       } catch (e) {
