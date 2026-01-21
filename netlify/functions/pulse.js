@@ -1,29 +1,29 @@
 /**
- * Logică Automatizare Premium Car Wash v21.0 - FORCE UPDATE & CACHE BUSTER
+ * Logică Automatizare Premium Car Wash v22.0 - CRITICAL CACHE BUSTER
  * Status: ID cc7b5c0a2538 CONFIRMAT | Server 232-eu CONFIRMAT
- * Fix: Mesaj nou pentru confirmare deploy + Logica de salvare forțată
+ * Modificări: Schimbare RADICALĂ de mesaj pentru a verifica deploy-ul.
  */
 
 exports.handler = async (event) => {
   const headers = {
     "Content-Type": "application/json",
     "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Headers": "Content-Type",
-    "Access-Control-Allow-Methods": "POST, OPTIONS"
+    "Access-Control-Allow-Headers": "Content-Type, Cache-Control",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Cache-Control": "no-cache, no-store, must-revalidate" // Forțăm browserul să nu memoreze răspunsul
   };
 
   if (event.httpMethod === "OPTIONS") return { statusCode: 204, headers, body: "" };
 
   try {
-    // 1. INPUT
-    if (!event.body) throw new Error("Body gol.");
+    if (!event.body) throw new Error("Lipsă date.");
     const bodyParams = JSON.parse(event.body);
     const { nr_inmatriculare } = bodyParams;
-    if (!nr_inmatriculare) throw new Error("Lipsește numărul.");
+    if (!nr_inmatriculare) throw new Error("Lipsă număr.");
     
     const plateId = nr_inmatriculare.toUpperCase().replace(/\s+/g, '');
     
-    // 2. CONFIG HARDCODED
+    // CONFIG HARDCODED
     const shellyBaseUrl = "https://shelly-232-eu.shelly.cloud/device/rpc";
     const deviceID = "cc7b5c0a2538"; 
     const authKey = "M2M1YzY4dWlk2D1432348AD156ADC971DE839C20DAAD09B58D673106CE2B67A97A9C47F9ADA674C2C7B75B7A081F"; 
@@ -37,51 +37,47 @@ exports.handler = async (event) => {
         "appId": "1:1066804021666:web:9494cf947ea14502758afb"
     };
     
-    // 3. FIREBASE READ
     const fbUrl = `https://firestore.googleapis.com/v1/projects/${fbConfig.projectId}/databases/(default)/documents/artifacts/premium-car-wash/public/data/loyalty/${plateId}`;
     
-    let activeStamps = 0;
-    let isFreeWash = false;
-    let dbMethod = "PATCH";
-
     const getRes = await fetch(fbUrl);
     const userData = await getRes.json();
     
+    let activeStamps = 1; // Default pentru client nou
+    let isFreeWash = false;
+    let dbMethod = "POST";
+
     if (userData.fields) {
-      // Client existent
+      dbMethod = "PATCH";
       let current = 0;
-      if (userData.fields.stampile_active.integerValue) current = parseInt(userData.fields.stampile_active.integerValue);
-      else if (userData.fields.stampile_active.stringValue) current = parseInt(userData.fields.stampile_active.stringValue);
+      const field = userData.fields.stampile_active;
+      if (field) {
+          current = parseInt(field.integerValue || field.stringValue || "0");
+      }
       
       activeStamps = isNaN(current) ? 1 : current + 1;
+      
       if (activeStamps >= 5) {
         isFreeWash = true;
         activeStamps = 0; 
       }
-    } else {
-      // Client nou (404 sau eroare)
-      activeStamps = 1;
-      dbMethod = "POST";
     }
 
-    // 4. FIREBASE WRITE
+    // Salvăm forțat ca String pentru a evita orice eroare de tip
+    const finalCount = String(activeStamps);
+
     const saveUrl = (dbMethod === "PATCH") ? `${fbUrl}?updateMask.fieldPaths=stampile_active` : fbUrl.replace(`/${plateId}`, `?documentId=${plateId}`);
     
-    // Forțăm activeStamps să fie String pentru a nu trimite obiecte goale
-    const finalStamps = String(activeStamps);
-
     await fetch(saveUrl, {
       method: dbMethod,
       body: JSON.stringify({
         fields: {
           nr_inmatriculare: { stringValue: plateId },
-          stampile_active: { integerValue: finalStamps }
+          stampile_active: { integerValue: finalCount }
         }
       })
     });
 
-    // 5. SHELLY
-    let shellyLog = "N/A";
+    let shellyLog = "Inactiv";
     if (isFreeWash) {
       const rpcParams = JSON.stringify({ id: 0, on: true, toggle_after: 5 });
       const postData = new URLSearchParams();
@@ -98,12 +94,14 @@ exports.handler = async (event) => {
       shellyLog = await resS.text();
     }
 
+    // Dacă vezi "ÎNREGISTRATĂ" pe ecran, înseamnă că acest cod NU a fost instalat!
     return {
       statusCode: 200,
       headers,
       body: JSON.stringify({ 
         status: "success", 
-        message: isFreeWash ? "🔥 SPĂLARE GRATUITĂ!" : `>>> V21-FIX <<< Vizita: ${finalStamps}/5`, 
+        message: isFreeWash ? "🔥 SPĂLARE GRATUITĂ!" : `[STATUS V22] Vizite: ${finalCount} din 5`, 
+        version: "22.0",
         debug: shellyLog 
       })
     };
@@ -112,7 +110,7 @@ exports.handler = async (event) => {
     return {
       statusCode: 200,
       headers,
-      body: JSON.stringify({ status: "error", message: err.message, debug: "v21-error" })
+      body: JSON.stringify({ status: "error", message: err.message, debug: "v22-critical-err" })
     };
   }
 };
