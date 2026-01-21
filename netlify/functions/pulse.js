@@ -1,10 +1,9 @@
 /**
- * Logică Automatizare Premium Car Wash v8.8 - ULTIMATE RELIABILITY
- * Fix: Protecție crash la parsare, Verificare Env Vars și Debugging Granular
+ * Logică Automatizare Premium Car Wash v15.0 - CONFIGURAȚIE VALIDATĂ
+ * Status: ID cc7b5c0a2538 CONFIRMAT | Server 232-eu CONFIRMAT | Cheie CONFIRMATĂ
  */
 
 exports.handler = async (event) => {
-  // Headere pentru Cross-Origin Resource Sharing (CORS)
   const headers = {
     "Content-Type": "application/json",
     "Access-Control-Allow-Origin": "*",
@@ -12,29 +11,21 @@ exports.handler = async (event) => {
     "Access-Control-Allow-Methods": "POST, OPTIONS"
   };
 
-  // Răspuns rapid pentru pre-flight request-ul browserului
   if (event.httpMethod === "OPTIONS") return { statusCode: 204, headers, body: "" };
 
   try {
-    // 1. Validare Body Request
-    if (!event.body) throw new Error("Body-ul cererii este gol.");
-    const body = JSON.parse(event.body);
-    const { telefon, nr_inmatriculare } = body;
-    
-    if (!nr_inmatriculare) throw new Error("Lipsește numărul de înmatriculare.");
+    const { nr_inmatriculare } = JSON.parse(event.body);
     const plateId = nr_inmatriculare.toUpperCase().replace(/\s+/g, '');
     
-    // 2. Validare Configurații Cloud
-    if (!process.env.FIREBASE_CONFIG) throw new Error("Lipsește variabila FIREBASE_CONFIG în Netlify.");
-    if (!process.env.SHELLY_IP) throw new Error("Lipsește variabila SHELLY_IP în Netlify.");
+    // --- CONFIGURAȚIE SHELLY EXTRASĂ DIN JSON ---
+    const shellyBaseUrl = "https://shelly-232-eu.shelly.cloud/device/rpc";
+    const deviceID = "cc7b5c0a2538"; // Confirmat din JSON-ul tău (litere mici)
+    const authKey = "M2M1YzY4dWlk2D1432348AD156ADC971DE839C20DAAD09B58D673106CE2B67A97A9C47F9ADA674C2C7B75B7A081F"; // Cheia care a dat 'isok: true'
 
     const fbConfig = JSON.parse(process.env.FIREBASE_CONFIG);
-    const shellyConfigUrl = process.env.SHELLY_IP.trim();
-    const projectId = fbConfig.projectId;
     
-    // 3. FIREBASE: Citire date client
-    const fbUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/artifacts/premium-car-wash/public/data/loyalty/${plateId}`;
-    
+    // 1. FIREBASE: Status Vizite
+    const fbUrl = `https://firestore.googleapis.com/v1/projects/${fbConfig.projectId}/databases/(default)/documents/artifacts/premium-car-wash/public/data/loyalty/${plateId}`;
     const getRes = await fetch(fbUrl);
     const userData = await getRes.json();
     
@@ -42,7 +33,6 @@ exports.handler = async (event) => {
     let isFreeWash = false;
     let dbMethod = "PATCH";
 
-    // Verificăm dacă documentul există sau e nou
     if (userData.error && userData.error.code === 404) {
       activeStamps = 1;
       dbMethod = "POST";
@@ -53,16 +43,11 @@ exports.handler = async (event) => {
         isFreeWash = true;
         activeStamps = 0; 
       }
-    } else {
-      throw new Error("Răspuns Firebase invalid.");
     }
 
-    // 4. FIREBASE: Salvare Vizită
-    const saveUrl = (dbMethod === "PATCH") 
-      ? `${fbUrl}?updateMask.fieldPaths=stampile_active` 
-      : fbUrl.replace(`/${plateId}`, `?documentId=${plateId}`);
-    
-    const saveRes = await fetch(saveUrl, {
+    // 2. FIREBASE: Salvare Vizită
+    const saveUrl = (dbMethod === "PATCH") ? `${fbUrl}?updateMask.fieldPaths=stampile_active` : fbUrl.replace(`/${plateId}`, `?documentId=${plateId}`);
+    await fetch(saveUrl, {
       method: dbMethod,
       body: JSON.stringify({
         fields: {
@@ -72,42 +57,28 @@ exports.handler = async (event) => {
       })
     });
 
-    if (!saveRes.ok) {
-      const saveErr = await saveRes.text();
-      throw new Error(`Eroare salvare Firebase: ${saveErr}`);
-    }
-
-    // 5. SHELLY TRIGGER (Execuție la vizita 5)
-    let shellyLog = "Vizită salvată. Nu s-a atins pragul.";
-    
+    // 3. SHELLY TRIGGER (Configurație Finală)
+    let shellyLog = "N/A";
     if (isFreeWash) {
-      try {
-        const urlObj = new URL(shellyConfigUrl);
-        const authKey = urlObj.searchParams.get("auth_key");
-        const deviceId = urlObj.searchParams.get("cid") || urlObj.searchParams.get("id");
-        
-        const rpcUrl = `https://shelly-232-eu.shelly.cloud/device/rpc`;
-        const paramsJSON = JSON.stringify({ id: 0, on: true, toggle_after: 240 });
+      // Parametrii pentru Switch:0 (văzut în JSON)
+      const rpcParams = JSON.stringify({ id: 0, on: true, toggle_after: 5 });
+      
+      const postData = new URLSearchParams();
+      postData.append('id', deviceID);
+      postData.append('auth_key', authKey);
+      postData.append('method', 'Switch.Set');
+      postData.append('params', rpcParams);
 
-        const payload = new URLSearchParams();
-        payload.append("id", deviceId);
-        payload.append("auth_key", authKey);
-        payload.append("method", "Switch.Set");
-        payload.append("params", paramsJSON);
+      console.log(`[SHELLY] Sending command to ${deviceID} on 232-eu...`);
 
-        const resShelly = await fetch(rpcUrl, {
-          method: "POST",
-          headers: { 
-            "Content-Type": "application/x-www-form-urlencoded",
-            "User-Agent": "Mozilla/5.0" 
-          },
-          body: payload.toString()
-        });
-
-        shellyLog = await resShelly.text();
-      } catch (e) {
-        shellyLog = `Eroare trigger Shelly: ${e.message}`;
-      }
+      const resS = await fetch(shellyBaseUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: postData.toString()
+      });
+      
+      shellyLog = await resS.text();
+      console.log(`[SHELLY] Response: ${shellyLog}`);
     }
 
     return {
@@ -115,21 +86,17 @@ exports.handler = async (event) => {
       headers,
       body: JSON.stringify({ 
         status: "success", 
-        message: isFreeWash ? "🔥 SPĂLARE GRATUITĂ!" : `Vizita ${activeStamps}/5 înregistrată.`,
+        message: isFreeWash ? "🔥 SPĂLARE GRATUITĂ ACTIVATĂ!" : `Vizita ${activeStamps}/5 înregistrată.`, 
         debug: shellyLog 
       })
     };
 
-  } catch (error) {
-    // Prindem orice eroare și o trimitem către frontend pentru a elimina "Necunoscută"
-    return { 
-      statusCode: 200, // Trimitem 200 chiar și la eroare pentru ca browserul să poată citi JSON-ul
-      headers, 
-      body: JSON.stringify({ 
-        status: "error", 
-        message: "Eroare Procesare",
-        debug: error.message 
-      }) 
+  } catch (err) {
+    console.error(err);
+    return {
+      statusCode: 200,
+      headers,
+      body: JSON.stringify({ status: "error", message: "Eroare Server", debug: err.message })
     };
   }
 };
