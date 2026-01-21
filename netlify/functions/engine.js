@@ -1,7 +1,7 @@
 /**
- * Motor de Automatizare Premium Car Wash - Versiunea v33.0 [PROD-READY]
+ * Motor de Automatizare Premium Car Wash - Versiunea v36.0 [FORCE-CLICK]
  * Status: ID cc7b5c0a2538 | Server 232-eu
- * Fix: Adăugare API Key în REST path + Diagnostic avansat
+ * Fix: Sistem Dual-ID (încearcă ambele formate de ID Shelly pentru a garanta Click-ul)
  */
 
 exports.handler = async (event) => {
@@ -20,18 +20,16 @@ exports.handler = async (event) => {
 
     if (nrAuto === "ANONIM") throw new Error("Număr auto nevalid.");
 
-    // CONFIGURATIE HARDCODED (Sursa de Adevăr)
-    const deviceID = "cc7b5c0a2538";
-    const authKey = "M2M1YzY4dWlk2D1432348AD156ADC971DE839C20DAAD09B58D673106CE2B67A97A9C47F9ADA674C2C7B75B7A081F";
-    const shellyUrl = "https://shelly-232-eu.shelly.cloud/device/rpc";
     const projectId = "premium-car-wash-systems";
     const apiKey = "AIzaSyDlzoN9-l_Gvk3ZV2sERlRNQux5QdoSYi4";
-
-    // 1. PATH FIREBASE (Conform Regulii 1 - Securizat cu API Key)
-    const fbBaseUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/artifacts/premium-car-wash/public/data/loyalty/${nrAuto}?key=${apiKey}`;
+    const shellyUrl = "https://shelly-232-eu.shelly.cloud/device/rpc";
     
-    // 2. CITIRE DATE
-    const responseFB = await fetch(fbBaseUrl);
+    // Cheia ta de autorizare (Am păstrat formatul cu liniuță)
+    const authKey = "M2M1YzY4dWlk-1432348AD156ADC971DE839C20DAAD09B58D673106CE2B67A97A9C47F9ADA674C2C7B75B7A081F";
+
+    const fbUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/artifacts/premium-car-wash/public/data/loyalty/${nrAuto}?key=${apiKey}`;
+
+    const responseFB = await fetch(fbUrl);
     const dataFB = await responseFB.json();
 
     let activeStamps = 0;
@@ -39,27 +37,21 @@ exports.handler = async (event) => {
     let dbMethod = "PATCH";
 
     if (dataFB.fields) {
-      // Client existent
       const field = dataFB.fields.stampile_active;
       let current = parseInt(field?.integerValue || field?.stringValue || "0");
-      if (isNaN(current)) current = 0;
-      
-      activeStamps = current + 1;
+      activeStamps = isNaN(current) ? 1 : current + 1;
       if (activeStamps >= 5) {
         isFreeWash = true;
-        activeStamps = 0; 
+        activeStamps = 0;
       }
     } else {
-      // Client nou
       activeStamps = 1;
       dbMethod = "POST";
     }
 
     const countStr = String(activeStamps);
-    
-    // 3. SALVARE DATE (Calculăm URL-ul de scriere)
     const writeUrl = (dbMethod === "PATCH") 
-        ? `${fbBaseUrl}&updateMask.fieldPaths=stampile_active` 
+        ? `${fbUrl}&updateMask.fieldPaths=stampile_active` 
         : `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/artifacts/premium-car-wash/public/data/loyalty?documentId=${nrAuto}&key=${apiKey}`;
 
     await fetch(writeUrl, {
@@ -72,23 +64,39 @@ exports.handler = async (event) => {
       })
     });
 
-    // 4. COMANDA SHELLY
-    let clickResult = "Așteptare";
+    // --- LOGICA SHELLY DUAL-ATTEMPT (v36) ---
+    let shellyLog = "N/A";
     if (isFreeWash) {
-      const params = JSON.stringify({ id: 0, on: true, toggle_after: 5 });
-      const postData = new URLSearchParams();
-      postData.append('id', deviceID);
-      postData.append('auth_key', authKey);
-      postData.append('method', 'Switch.Set');
-      postData.append('params', params);
+      const idsToTry = ["cc7b5c0a2538", "shellyplusuni-cc7b5c0a2538"];
+      let success = false;
 
-      const resS = await fetch(shellyUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: postData.toString()
-      });
-      const resText = await resS.text();
-      clickResult = resText.includes('"isok":true') ? "ACTIVAT" : "EROARE_SHELLY";
+      for (const currentId of idsToTry) {
+        try {
+          const params = JSON.stringify({ id: 0, on: true, toggle_after: 5 });
+          const postData = new URLSearchParams();
+          postData.append('id', currentId);
+          postData.append('auth_key', authKey);
+          postData.append('method', 'Switch.Set');
+          postData.append('params', params);
+
+          const resS = await fetch(shellyUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: postData.toString()
+          });
+          
+          const resText = await resS.text();
+          if (resText.includes('"isok":true')) {
+            shellyLog = `ACTIVAT (ID: ${currentId})`;
+            success = true;
+            break; 
+          } else {
+            shellyLog = `FAIL: ${resText.substring(0, 50)}`;
+          }
+        } catch (e) {
+          shellyLog = `ERR: ${e.message}`;
+        }
+      }
     }
 
     return {
@@ -96,8 +104,8 @@ exports.handler = async (event) => {
       headers,
       body: JSON.stringify({
         status: "success",
-        message: isFreeWash ? "🎁 GRATUIT ACTIVAT!" : `VIZITA: ${countStr} / 5 [v33]`,
-        info: `Status Shelly: ${clickResult}`
+        message: isFreeWash ? "🎁 GRATUIT ACTIVAT!" : `VIZITA: ${countStr} / 5 [v36]`,
+        info: `Status Shelly: ${shellyLog}`
       })
     };
 
@@ -105,7 +113,7 @@ exports.handler = async (event) => {
     return {
       statusCode: 200,
       headers,
-      body: JSON.stringify({ status: "error", message: "Buba: " + err.message })
+      body: JSON.stringify({ status: "error", message: "Eroare: " + err.message })
     };
   }
 };
