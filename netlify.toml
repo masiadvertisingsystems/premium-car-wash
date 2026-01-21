@@ -1,11 +1,22 @@
+# Netlify Configuration File - Versiunea v36.2 [ENGINE-SYNC]
+# Această configurare asigură că orice apel către /api/engine ajunge la noul motor.
+
 [build]
+  # Folderul unde Netlify caută funcțiile serverless
   functions = "netlify/functions"
+  
+  # Directorul de publicare (rădăcina unde se află index.html)
   publish = "."
 
-[functions]
-  node_bundler = "esbuild"
-
+# REGULI DE REDIRECȚIONARE (Inima sistemului de comunicare)
 [[redirects]]
+  # Permite apelarea /api/engine în loc de adresa lungă /.netlify/functions/engine
   from = "/api/*"
   to = "/.netlify/functions/:splat"
   status = 200
+
+[functions]
+  # Forțăm bundling-ul pentru a asigura că toate dependințele sunt incluse
+  node_bundle = true
+  # Setăm versiunea de Node pentru stabilitate maximă
+  node_version = "20"
