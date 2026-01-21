@@ -1,7 +1,7 @@
 /**
- * Logică Automatizare Premium Car Wash v19.0 - FINAL SAFETY CHECK
+ * Logică Automatizare Premium Car Wash v20.0 - ULTRA-AGRESIVE SAFETY
  * Status: ID cc7b5c0a2538 CONFIRMAT | Server 232-eu CONFIRMAT
- * Fix: Prevenire totală a valorii "undefined" + Confirmare vizuală update
+ * Fix: Forțare numerică totală + Identificator Versiune [V20]
  */
 
 exports.handler = async (event) => {
@@ -49,47 +49,40 @@ exports.handler = async (event) => {
         userData = await getRes.json();
     } catch (e) {
         console.error("Firebase Read Error:", e);
-        userData = {}; // Fallback
+        userData = {};
     }
     
-    // Initializare sigură cu valoare numerică
+    // Initializare forțată numerică
     let activeStamps = 0;
     let isFreeWash = false;
     let dbMethod = "PATCH";
 
     if (userData.error && userData.error.code === 404) {
-      // Client nou
       activeStamps = 1;
       dbMethod = "POST";
     } else if (userData.fields) {
-      // Client existent
       let currentStamps = 0;
       const rawField = userData.fields.stampile_active;
       
       if (rawField) {
-          if (rawField.integerValue) {
-              currentStamps = parseInt(rawField.integerValue);
-          } else if (rawField.stringValue) {
-              currentStamps = parseInt(rawField.stringValue);
-          }
+          if (rawField.integerValue) currentStamps = parseInt(rawField.integerValue);
+          else if (rawField.stringValue) currentStamps = parseInt(rawField.stringValue);
       }
 
-      if (isNaN(currentStamps)) currentStamps = 0;
-      activeStamps = currentStamps + 1;
+      if (isNaN(currentStamps) || currentStamps === null) currentStamps = 0;
+      activeStamps = Number(currentStamps) + 1;
       
       if (activeStamps >= 5) {
         isFreeWash = true;
         activeStamps = 0; 
       }
     } else {
-        // Caz de siguranță: document există dar e gol sau eroare diferită de 404
         activeStamps = 1;
     }
 
     // --- PROTECȚIE FINALĂ ---
-    // Dacă din orice motiv cosmic a ajuns undefined, îl reparăm forțat
-    if (activeStamps === undefined || activeStamps === null || isNaN(activeStamps)) {
-        console.log("Variabila activeStamps a fost coruptă. Resetare la 1.");
+    // Ne asigurăm că activeStamps este un NUMĂR valid înainte de orice altceva
+    if (typeof activeStamps !== 'number' || isNaN(activeStamps)) {
         activeStamps = 1;
     }
 
@@ -122,17 +115,18 @@ exports.handler = async (event) => {
         body: postData.toString()
       });
       
-      const resText = await resS.text();
-      shellyLog = resText;
+      shellyLog = await resS.text();
     }
 
-    // Mesaj modificat pentru a confirma update-ul ("OK")
+    // Conversie explicită la string pentru a evita "undefined" în template literal
+    const displayCount = String(activeStamps);
+
     return {
       statusCode: 200,
       headers,
       body: JSON.stringify({ 
         status: "success", 
-        message: isFreeWash ? "🔥 SPĂLARE GRATUITĂ ACTIVATĂ!" : `Vizita ${activeStamps}/5 (OK).`, 
+        message: isFreeWash ? "🔥 SPĂLARE GRATUITĂ ACTIVATĂ!" : `Vizita ${displayCount}/5 [V20].`, 
         debug: shellyLog 
       })
     };
@@ -141,7 +135,7 @@ exports.handler = async (event) => {
     return {
       statusCode: 200,
       headers,
-      body: JSON.stringify({ status: "error", message: err.message, debug: err.stack })
+      body: JSON.stringify({ status: "error", message: err.message, debug: "v20-err" })
     };
   }
 };
