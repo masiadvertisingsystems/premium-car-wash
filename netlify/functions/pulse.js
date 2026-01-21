@@ -1,6 +1,6 @@
 /**
- * Logică Automatizare Premium Car Wash v8.3 - ULTIMATE PRECISION
- * Fix: Transmisie brută tip String pentru compatibilitate maximă Shelly Gen2
+ * Logică Automatizare Premium Car Wash v8.4 - PRO PRODUCTION
+ * Fix: Mapare strictă JSON pentru Shelly Gen2 și Debugging granular
  */
 
 exports.handler = async (event) => {
@@ -17,11 +17,16 @@ exports.handler = async (event) => {
     const { telefon, nr_inmatriculare } = JSON.parse(event.body);
     const plateId = nr_inmatriculare.toUpperCase().replace(/\s+/g, '');
     
+    // Validare Configurații
+    if (!process.env.FIREBASE_CONFIG || !process.env.SHELLY_IP) {
+      throw new Error("Lipsesc variabilele de mediu (FIREBASE_CONFIG sau SHELLY_IP)");
+    }
+
     const fbConfig = JSON.parse(process.env.FIREBASE_CONFIG);
     const shellyConfigUrl = process.env.SHELLY_IP.trim();
     const projectId = fbConfig.projectId;
     
-    // 1. FIREBASE: Citire date
+    // 1. FIREBASE: Citire date client
     const fbUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/artifacts/premium-car-wash/public/data/loyalty/${plateId}`;
     const getRes = await fetch(fbUrl);
     const userData = await getRes.json();
@@ -42,8 +47,11 @@ exports.handler = async (event) => {
       }
     }
 
-    // 2. FIREBASE: Salvare
-    const saveUrl = (dbMethod === "PATCH") ? `${fbUrl}?updateMask.fieldPaths=stampile_active&updateMask.fieldPaths=last_visit` : fbUrl.replace(`/${plateId}`, `?documentId=${plateId}`);
+    // 2. FIREBASE: Salvare vizită
+    const saveUrl = (dbMethod === "PATCH") 
+      ? `${fbUrl}?updateMask.fieldPaths=stampile_active&updateMask.fieldPaths=last_visit` 
+      : fbUrl.replace(`/${plateId}`, `?documentId=${plateId}`);
+    
     await fetch(saveUrl, {
       method: dbMethod,
       body: JSON.stringify({
@@ -56,8 +64,8 @@ exports.handler = async (event) => {
       })
     });
 
-    // 3. SHELLY TRIGGER (Metoda "Forță Brută")
-    let shellyLog = "Nu a fost necesară spălarea";
+    // 3. SHELLY TRIGGER (Metoda POST Securizată)
+    let shellyResponseData = "Nicio acțiune hardware.";
     
     if (isFreeWash) {
       const urlObj = new URL(shellyConfigUrl);
@@ -65,11 +73,12 @@ exports.handler = async (event) => {
       const deviceId = urlObj.searchParams.get("cid") || urlObj.searchParams.get("id");
       const rpcUrl = `${urlObj.origin}/device/rpc`;
 
-      // Construim corpul mesajului EXACT cum îl vrea serverul 232-eu
+      // Payload specific pentru Shelly Plus Uni (Gen2)
       const bodyParams = new URLSearchParams();
       bodyParams.append('auth_key', authKey);
       bodyParams.append('id', deviceId);
       bodyParams.append('method', 'Switch.Set');
+      // Importat: id:0 pentru primul canal, id:1 pentru al doilea
       bodyParams.append('params', JSON.stringify({ id: 0, on: true, toggle_after: 240 }));
 
       const resShelly = await fetch(rpcUrl, {
@@ -78,23 +87,31 @@ exports.handler = async (event) => {
         body: bodyParams.toString()
       });
 
-      const responseText = await resShelly.text();
-      shellyLog = `Răspuns Shelly: ${responseText}`;
+      shellyResponseData = await resShelly.text();
     }
 
+    // Returnăm un obiect structurat pentru a evita 'undefined' în frontend
     return {
       statusCode: 200,
       headers,
       body: JSON.stringify({ 
         status: "success", 
-        activeStamps, 
-        isFreeWash, 
-        message: isFreeWash ? "🔥 SPĂLARE ACTIVATĂ!" : `Vizita ${activeStamps}/5 înregistrată.`,
-        debug: shellyLog
+        activeStamps: activeStamps, 
+        isFreeWash: isFreeWash, 
+        message: isFreeWash ? "🔥 CLICK ACTIVAT!" : `Vizita ${activeStamps}/5 înregistrată.`,
+        debug: shellyResponseData
       })
     };
 
   } catch (error) {
-    return { statusCode: 500, headers, body: JSON.stringify({ status: "error", error: error.message }) };
+    return { 
+      statusCode: 500, 
+      headers, 
+      body: JSON.stringify({ 
+        status: "error", 
+        message: "Eroare de sistem",
+        debug: error.message 
+      }) 
+    };
   }
 };
