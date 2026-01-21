@@ -1,103 +1,126 @@
-<!DOCTYPE html>
-<html lang="ro">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Premium Wash | Loialitate Digitală</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
-        body { font-family: 'Inter', sans-serif; }
-        .glass { background: rgba(15, 23, 42, 0.9); backdrop-filter: blur(16px); }
-        .input-glow:focus { box-shadow: 0 0 15px rgba(14, 165, 233, 0.2); }
-    </style>
-</head>
-<body class="bg-slate-950 text-white min-h-screen flex items-center justify-center p-4">
-    <div class="w-full max-w-md glass rounded-[2.5rem] p-10 border border-white/10 shadow-2xl">
-        <div class="text-center mb-10">
-            <h1 class="text-3xl font-black tracking-tight text-sky-500 uppercase">PREMIUM WASH</h1>
-            <p class="text-slate-400 text-xs mt-2 font-mono uppercase tracking-[0.2em]">Sistem Automat v36.2</p>
-        </div>
+/**
+ * Motor de Automatizare Premium Car Wash - Versiunea v37.0 [STABILITY-MAX]
+ * Status: ID cc7b5c0a2538 | Server 232-eu
+ * Fix: Gestionare eroare "max_req" (Shelly Cloud Rate Limit)
+ */
 
-        <form id="loyaltyForm" class="space-y-6">
-            <div class="space-y-2">
-                <label class="text-[10px] font-black text-slate-500 ml-4 uppercase tracking-widest">Nr. Înmatriculare</label>
-                <input type="text" id="plate" placeholder="B 01 ABC" required 
-                    class="w-full bg-slate-900/50 p-5 rounded-2xl outline-none border border-white/5 text-2xl text-center uppercase font-black focus:border-sky-500 transition-all input-glow">
-            </div>
-            
-            <div class="space-y-2">
-                <label class="text-[10px] font-black text-slate-500 ml-4 uppercase tracking-widest">Telefon</label>
-                <input type="tel" id="phone" placeholder="07xx xxx xxx" required 
-                    class="w-full bg-slate-900/50 p-5 rounded-2xl outline-none border border-white/5 text-center font-bold focus:border-sky-500 transition-all">
-            </div>
+exports.handler = async (event) => {
+  const headers = {
+    "Content-Type": "application/json",
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Cache-Control": "no-cache, no-store, must-revalidate"
+  };
 
-            <button type="submit" id="submitBtn" 
-                class="w-full bg-sky-600 hover:bg-sky-500 p-5 rounded-2xl font-black text-xl uppercase shadow-lg shadow-sky-900/20 transition-all active:scale-95 disabled:opacity-50">
-                Înregistrează Vizita
-            </button>
-        </form>
+  if (event.httpMethod === "OPTIONS") return { statusCode: 204, headers, body: "" };
 
-        <!-- Mesaje de Status -->
-        <div id="statusMessage" class="mt-8 text-center min-h-[5rem] flex flex-col items-center justify-center"></div>
-        
-        <div class="mt-6 pt-6 border-t border-white/5 text-center">
-            <p class="text-[10px] text-slate-600 uppercase font-bold tracking-widest">Digital Loyalty System &copy; 2026</p>
-        </div>
-    </div>
+  try {
+    if (!event.body) throw new Error("Date lipsă.");
+    const body = JSON.parse(event.body);
+    const nrAuto = body.nr_inmatriculare ? body.nr_inmatriculare.toUpperCase().replace(/\s+/g, '') : "ANONIM";
 
-    <script>
-        document.getElementById('loyaltyForm').onsubmit = async (e) => {
-            e.preventDefault();
-            const btn = document.getElementById('submitBtn');
-            const msg = document.getElementById('statusMessage');
-            
-            btn.disabled = true;
-            btn.innerText = "CONECTARE...";
-            msg.innerHTML = "";
+    if (nrAuto === "ANONIM") throw new Error("Număr auto nevalid.");
 
-            try {
-                // Apelăm endpoint-ul /api/engine conform configurației din netlify.toml
-                const response = await fetch('/api/engine', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        nr_inmatriculare: document.getElementById('plate').value,
-                        telefon: document.getElementById('phone').value 
-                    })
-                });
+    const projectId = "premium-car-wash-systems";
+    const apiKey = "AIzaSyDlzoN9-l_Gvk3ZV2sERlRNQux5QdoSYi4";
+    const shellyUrl = "https://shelly-232-eu.shelly.cloud/device/rpc";
+    const authKey = "M2M1YzY4dWlk-1432348AD156ADC971DE839C20DAAD09B58D673106CE2B67A97A9C47F9ADA674C2C7B75B7A081F";
 
-                if (!response.ok) {
-                    throw new Error(`Serverul nu a răspuns (Cod: ${response.status})`);
-                }
+    // 1. FIREBASE: CITIRE
+    const fbUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/artifacts/premium-car-wash/public/data/loyalty/${nrAuto}?key=${apiKey}`;
+    const responseFB = await fetch(fbUrl);
+    const dataFB = await responseFB.json();
 
-                const data = await response.json();
-                
-                if (data.status === "success") {
-                    msg.innerHTML = `
-                        <div class="text-sky-400 text-2xl font-black tracking-tighter animate-pulse">${data.message}</div>
-                        <div class="text-slate-500 text-[10px] mt-2 uppercase font-bold tracking-widest opacity-60">${data.info || ''}</div>
-                    `;
-                    // Resetăm formularul după succes
-                    document.getElementById('plate').value = "";
-                } else {
-                    msg.innerHTML = `
-                        <div class="text-red-400 font-bold bg-red-900/10 p-4 rounded-xl w-full border border-red-900/20">
-                            ${data.message}
-                        </div>
-                    `;
-                }
-            } catch (err) {
-                console.error("Fetch Error:", err);
-                msg.innerHTML = `
-                    <div class="text-red-500 font-black text-lg">CONEXIUNE EȘUATĂ</div>
-                    <div class="text-slate-500 text-[9px] mt-1 font-mono uppercase">Verifică netlify.toml și engine.js [v36.2]</div>
-                `;
-            } finally {
-                btn.disabled = false;
-                btn.innerText = "Înregistrează Vizita";
+    let activeStamps = 0;
+    let isFreeWash = false;
+    let dbMethod = "PATCH";
+
+    if (dataFB.fields) {
+      const field = dataFB.fields.stampile_active;
+      let current = parseInt(field?.integerValue || field?.stringValue || "0");
+      activeStamps = isNaN(current) ? 1 : current + 1;
+      if (activeStamps >= 5) {
+        isFreeWash = true;
+        activeStamps = 0; 
+      }
+    } else {
+      activeStamps = 1;
+      dbMethod = "POST";
+    }
+
+    const countStr = String(activeStamps);
+    
+    // 2. FIREBASE: SALVARE
+    const writeUrl = (dbMethod === "PATCH") 
+        ? `${fbUrl}&updateMask.fieldPaths=stampile_active` 
+        : `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/artifacts/premium-car-wash/public/data/loyalty?documentId=${nrAuto}&key=${apiKey}`;
+
+    await fetch(writeUrl, {
+      method: dbMethod,
+      body: JSON.stringify({
+        fields: {
+          nr_inmatriculare: { stringValue: nrAuto },
+          stampile_active: { integerValue: countStr }
+        }
+      })
+    });
+
+    // 3. LOGICA SHELLY CU GESTIONARE LIMITĂ (Rate Limit)
+    let shellyLog = "N/A";
+    if (isFreeWash) {
+      const idsToTry = ["cc7b5c0a2538", "shellyplusuni-cc7b5c0a2538"];
+      
+      for (const currentId of idsToTry) {
+        try {
+          const params = JSON.stringify({ id: 0, on: true, toggle_after: 5 });
+          const postData = new URLSearchParams();
+          postData.append('id', currentId);
+          postData.append('auth_key', authKey);
+          postData.append('method', 'Switch.Set');
+          postData.append('params', params);
+
+          const resS = await fetch(shellyUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: postData.toString()
+          });
+          
+          const resText = await resS.text();
+          const resJson = JSON.parse(resText);
+
+          if (resJson.isok) {
+            shellyLog = `ACTIVAT (ID: ${currentId})`;
+            break; 
+          } else {
+            // Verificăm dacă eroarea este de limitare cereri
+            if (resJson.errors && resJson.errors.max_req) {
+              shellyLog = "SISTEM OCUPAT (Rate Limit). Reîncearcă în 60 sec.";
+              break; // Oprim încercările inutile
             }
-        };
-    </script>
-</body>
-</html>
+            shellyLog = `FAIL: ${resText.substring(0, 40)}`;
+          }
+        } catch (e) {
+          shellyLog = `ERR: ${e.message}`;
+        }
+      }
+    }
+
+    return {
+      statusCode: 200,
+      headers,
+      body: JSON.stringify({
+        status: "success",
+        message: isFreeWash ? "🎁 GRATUIT ACTIVAT!" : `VIZITA: ${countStr} / 5 [v37]`,
+        info: `Shelly: ${shellyLog}`
+      })
+    };
+
+  } catch (err) {
+    return {
+      statusCode: 200,
+      headers,
+      body: JSON.stringify({ status: "error", message: "Eroare: " + err.message })
+    };
+  }
+};
