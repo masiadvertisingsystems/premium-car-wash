@@ -1,6 +1,6 @@
 /**
- * Logică Automatizare Premium Car Wash v6.2 - LEGACY FALLBACK FORCE
- * Strategie: Revenire la metoda /device/relay/0 care a generat 'max_req' (dovada conexiunii)
+ * Logică Automatizare Premium Car Wash v6.3 - DUAL CHANNEL BREAKER
+ * Strategie: Atacă Canalul 0 si Canalul 1. Dacă unul e 404, celălalt trebuie să meargă.
  * Server: 232-EU | Device: cc7b5c0a2538
  */
 
@@ -62,8 +62,9 @@ exports.handler = async (event) => {
       })
     });
 
-    // 3. TRIGGER SHELLY (FORCE LEGACY ENDPOINT)
+    // 3. TRIGGER SHELLY (DUAL CHANNEL ATTACK)
     let finalStatus = "Inactiv";
+    let debugLog = "";
     
     if (isFreeWash) {
       const originalUrl = process.env.SHELLY_IP.trim();
@@ -77,26 +78,43 @@ exports.handler = async (event) => {
         if (!authKey || !cid) {
            finalStatus = "ERR_CHEI_LIPSA_URL";
         } else {
-            // FORȚĂM calea care știm că există (/device/relay/0)
-            // Aceasta este calea care a dat max_req, deci știm că serverul o acceptă
-            const legacyUrl = `${serverOrigin}/device/relay/0`;
+            const rpcUrl = `${serverOrigin}/device/rpc`;
             
-            const params = new URLSearchParams();
-            params.append('auth_key', authKey);
-            params.append('id', cid);
-            params.append('turn', 'on');
-            params.append('timer', '240'); // 4 minute
+            // Helper pentru POST RPC
+            const callRpc = async (methodName, paramsObj) => {
+                const p = new URLSearchParams();
+                p.append('auth_key', authKey);
+                p.append('id', cid);
+                p.append('method', methodName);
+                if (paramsObj) p.append('params', JSON.stringify(paramsObj));
+                
+                const r = await fetch(rpcUrl, { method: 'POST', body: p });
+                return await r.json();
+            };
 
-            console.log("Executare Legacy POST (Revenire la calea sigura)...");
-            const res = await fetch(legacyUrl, { method: 'POST', body: params });
-            const json = await res.json();
-
-            if (json.isok === true) {
-                finalStatus = "SUCCES_HARDWARE_LEGACY";
-            } else if (json.errors && json.errors.max_req) {
-                 finalStatus = "SERVER_BLOCAT_TEMPORAR (Asteapta 15 min)";
+            // TENTATIVA 1: Canal 0
+            console.log("Încercare Canal 0...");
+            let res0 = await callRpc('Switch.Set', { id: 0, on: true, toggle_after: 240 });
+            
+            if (res0.isok === true || (res0.result && res0.result.was_on !== undefined)) {
+                finalStatus = "SUCCES_CANAL_0";
             } else {
-                finalStatus = `ERR_SHELLY: ${JSON.stringify(json)}`;
+                debugLog += `CH0_FAIL: ${JSON.stringify(res0)} | `;
+                
+                // TENTATIVA 2: Canal 1 (Dacă 0 eșuează)
+                console.log("Încercare Canal 1...");
+                let res1 = await callRpc('Switch.Set', { id: 1, on: true, toggle_after: 240 });
+                
+                if (res1.isok === true || (res1.result && res1.result.was_on !== undefined)) {
+                    finalStatus = "SUCCES_CANAL_1";
+                } else {
+                    debugLog += `CH1_FAIL: ${JSON.stringify(res1)} | `;
+                    
+                    // TENTATIVA 3: DIAGNOSTIC (Vedem ce metode suportă de fapt)
+                    console.log("Diagnosticare...");
+                    let resStatus = await callRpc('Shelly.GetStatus', null);
+                    finalStatus = `ESEC_TOTAL. DIAGNOSTIC: ${JSON.stringify(resStatus).substring(0, 150)}`;
+                }
             }
         }
       } catch (e) {
@@ -113,7 +131,7 @@ exports.handler = async (event) => {
         isFreeWash, 
         message: isFreeWash ? "SPĂLARE GRATUITĂ ACTIVATĂ!" : `VIZITA ${activeStamps}/5 CONFIRMATĂ.`,
         shellyStatus: String(finalStatus),
-        debug: String(finalStatus)
+        debug: String(debugLog + finalStatus)
       })
     };
 
