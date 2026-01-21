@@ -1,7 +1,7 @@
 /**
  * Motor de Automatizare Premium Car Wash - Versiunea v36.0 [FORCE-CLICK]
  * Status: ID cc7b5c0a2538 | Server 232-eu
- * Fix: Sistem Dual-ID (încearcă ambele formate de ID Shelly pentru a garanta Click-ul)
+ * Strategie: 1M Euro - Eficiență maximă, mentenanță minimă.
  */
 
 exports.handler = async (event) => {
@@ -12,21 +12,26 @@ exports.handler = async (event) => {
     "Cache-Control": "no-cache, no-store, must-revalidate"
   };
 
+  // Gestionare pre-flight request pentru CORS
   if (event.httpMethod === "OPTIONS") return { statusCode: 204, headers, body: "" };
 
   try {
-    const body = JSON.parse(event.body || "{}");
+    // 1. ANALIZA DATE INTRARE
+    if (!event.body) throw new Error("Body cerere lipsă.");
+    const body = JSON.parse(event.body);
     const nrAuto = body.nr_inmatriculare ? body.nr_inmatriculare.toUpperCase().replace(/\s+/g, '') : "ANONIM";
 
     if (nrAuto === "ANONIM") throw new Error("Număr auto nevalid.");
 
+    // 2. CONFIGURAȚIE CLOUD (Sursa de Adevăr)
     const projectId = "premium-car-wash-systems";
     const apiKey = "AIzaSyDlzoN9-l_Gvk3ZV2sERlRNQux5QdoSYi4";
     const shellyUrl = "https://shelly-232-eu.shelly.cloud/device/rpc";
     
-    // Cheia ta de autorizare (Am păstrat formatul cu liniuță)
+    // FIX: AuthKey cu separator corect (-) pentru serverul 232-eu
     const authKey = "M2M1YzY4dWlk-1432348AD156ADC971DE839C20DAAD09B58D673106CE2B67A97A9C47F9ADA674C2C7B75B7A081F";
 
+    // 3. FIREBASE: CITIRE STATUS LOIALITATE
     const fbUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/artifacts/premium-car-wash/public/data/loyalty/${nrAuto}?key=${apiKey}`;
 
     const responseFB = await fetch(fbUrl);
@@ -37,19 +42,25 @@ exports.handler = async (event) => {
     let dbMethod = "PATCH";
 
     if (dataFB.fields) {
+      // Client existent: Procesăm ștampilele
       const field = dataFB.fields.stampile_active;
       let current = parseInt(field?.integerValue || field?.stringValue || "0");
+      
       activeStamps = isNaN(current) ? 1 : current + 1;
+      
       if (activeStamps >= 5) {
         isFreeWash = true;
-        activeStamps = 0;
+        activeStamps = 0; // Resetăm pentru următorul ciclu de profit
       }
     } else {
+      // Client nou: Prima vizită
       activeStamps = 1;
       dbMethod = "POST";
     }
 
     const countStr = String(activeStamps);
+    
+    // 4. FIREBASE: SALVARE STATUS ACTUALIZAT
     const writeUrl = (dbMethod === "PATCH") 
         ? `${fbUrl}&updateMask.fieldPaths=stampile_active` 
         : `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/artifacts/premium-car-wash/public/data/loyalty?documentId=${nrAuto}&key=${apiKey}`;
@@ -64,7 +75,8 @@ exports.handler = async (event) => {
       })
     });
 
-    // --- LOGICA SHELLY DUAL-ATTEMPT (v36) ---
+    // 5. LOGICA SHELLY DUAL-ATTEMPT (v36)
+    // Încercăm ambele formate de ID pentru a garanta execuția pe serverul 232-eu
     let shellyLog = "N/A";
     if (isFreeWash) {
       const idsToTry = ["cc7b5c0a2538", "shellyplusuni-cc7b5c0a2538"];
@@ -99,6 +111,7 @@ exports.handler = async (event) => {
       }
     }
 
+    // 6. RĂSPUNS FINAL CATRE INTERFAȚĂ
     return {
       statusCode: 200,
       headers,
@@ -113,7 +126,10 @@ exports.handler = async (event) => {
     return {
       statusCode: 200,
       headers,
-      body: JSON.stringify({ status: "error", message: "Eroare: " + err.message })
+      body: JSON.stringify({ 
+        status: "error", 
+        message: "Eroare: " + err.message 
+      })
     };
   }
 };
