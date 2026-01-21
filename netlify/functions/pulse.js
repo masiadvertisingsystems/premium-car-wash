@@ -1,7 +1,7 @@
 /**
- * Logică Automatizare Premium Car Wash v20.0 - ULTRA-AGRESIVE SAFETY
+ * Logică Automatizare Premium Car Wash v21.0 - FORCE UPDATE & CACHE BUSTER
  * Status: ID cc7b5c0a2538 CONFIRMAT | Server 232-eu CONFIRMAT
- * Fix: Forțare numerică totală + Identificator Versiune [V20]
+ * Fix: Mesaj nou pentru confirmare deploy + Logica de salvare forțată
  */
 
 exports.handler = async (event) => {
@@ -15,17 +15,15 @@ exports.handler = async (event) => {
   if (event.httpMethod === "OPTIONS") return { statusCode: 204, headers, body: "" };
 
   try {
-    // 1. VERIFICARE INPUT
+    // 1. INPUT
     if (!event.body) throw new Error("Body gol.");
-    let bodyParams;
-    try { bodyParams = JSON.parse(event.body); } catch (e) { throw new Error("JSON invalid."); }
-
+    const bodyParams = JSON.parse(event.body);
     const { nr_inmatriculare } = bodyParams;
     if (!nr_inmatriculare) throw new Error("Lipsește numărul.");
     
     const plateId = nr_inmatriculare.toUpperCase().replace(/\s+/g, '');
     
-    // 2. CONFIGURARE HARDCODED (Stabilă)
+    // 2. CONFIG HARDCODED
     const shellyBaseUrl = "https://shelly-232-eu.shelly.cloud/device/rpc";
     const deviceID = "cc7b5c0a2538"; 
     const authKey = "M2M1YzY4dWlk2D1432348AD156ADC971DE839C20DAAD09B58D673106CE2B67A97A9C47F9ADA674C2C7B75B7A081F"; 
@@ -33,7 +31,6 @@ exports.handler = async (event) => {
     const fbConfig = {
         "apiKey": "AIzaSyDlzoN9-l_Gvk3ZV2sERlRNQux5QdoSYi4",
         "authDomain": "premium-car-wash-systems.firebaseapp.com",
-        "databaseURL": "https://premium-car-wash-systems-default-rtdb.europe-west1.firebasedatabase.app",
         "projectId": "premium-car-wash-systems",
         "storageBucket": "premium-car-wash-systems.firebasestorage.app",
         "messagingSenderId": "1066804021666",
@@ -43,63 +40,47 @@ exports.handler = async (event) => {
     // 3. FIREBASE READ
     const fbUrl = `https://firestore.googleapis.com/v1/projects/${fbConfig.projectId}/databases/(default)/documents/artifacts/premium-car-wash/public/data/loyalty/${plateId}`;
     
-    let getRes, userData;
-    try {
-        getRes = await fetch(fbUrl);
-        userData = await getRes.json();
-    } catch (e) {
-        console.error("Firebase Read Error:", e);
-        userData = {};
-    }
-    
-    // Initializare forțată numerică
     let activeStamps = 0;
     let isFreeWash = false;
     let dbMethod = "PATCH";
 
-    if (userData.error && userData.error.code === 404) {
-      activeStamps = 1;
-      dbMethod = "POST";
-    } else if (userData.fields) {
-      let currentStamps = 0;
-      const rawField = userData.fields.stampile_active;
+    const getRes = await fetch(fbUrl);
+    const userData = await getRes.json();
+    
+    if (userData.fields) {
+      // Client existent
+      let current = 0;
+      if (userData.fields.stampile_active.integerValue) current = parseInt(userData.fields.stampile_active.integerValue);
+      else if (userData.fields.stampile_active.stringValue) current = parseInt(userData.fields.stampile_active.stringValue);
       
-      if (rawField) {
-          if (rawField.integerValue) currentStamps = parseInt(rawField.integerValue);
-          else if (rawField.stringValue) currentStamps = parseInt(rawField.stringValue);
-      }
-
-      if (isNaN(currentStamps) || currentStamps === null) currentStamps = 0;
-      activeStamps = Number(currentStamps) + 1;
-      
+      activeStamps = isNaN(current) ? 1 : current + 1;
       if (activeStamps >= 5) {
         isFreeWash = true;
         activeStamps = 0; 
       }
     } else {
-        activeStamps = 1;
-    }
-
-    // --- PROTECȚIE FINALĂ ---
-    // Ne asigurăm că activeStamps este un NUMĂR valid înainte de orice altceva
-    if (typeof activeStamps !== 'number' || isNaN(activeStamps)) {
-        activeStamps = 1;
+      // Client nou (404 sau eroare)
+      activeStamps = 1;
+      dbMethod = "POST";
     }
 
     // 4. FIREBASE WRITE
     const saveUrl = (dbMethod === "PATCH") ? `${fbUrl}?updateMask.fieldPaths=stampile_active` : fbUrl.replace(`/${plateId}`, `?documentId=${plateId}`);
     
+    // Forțăm activeStamps să fie String pentru a nu trimite obiecte goale
+    const finalStamps = String(activeStamps);
+
     await fetch(saveUrl, {
       method: dbMethod,
       body: JSON.stringify({
         fields: {
           nr_inmatriculare: { stringValue: plateId },
-          stampile_active: { integerValue: activeStamps.toString() }
+          stampile_active: { integerValue: finalStamps }
         }
       })
     });
 
-    // 5. SHELLY TRIGGER
+    // 5. SHELLY
     let shellyLog = "N/A";
     if (isFreeWash) {
       const rpcParams = JSON.stringify({ id: 0, on: true, toggle_after: 5 });
@@ -114,19 +95,15 @@ exports.handler = async (event) => {
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: postData.toString()
       });
-      
       shellyLog = await resS.text();
     }
-
-    // Conversie explicită la string pentru a evita "undefined" în template literal
-    const displayCount = String(activeStamps);
 
     return {
       statusCode: 200,
       headers,
       body: JSON.stringify({ 
         status: "success", 
-        message: isFreeWash ? "🔥 SPĂLARE GRATUITĂ ACTIVATĂ!" : `Vizita ${displayCount}/5 [V20].`, 
+        message: isFreeWash ? "🔥 SPĂLARE GRATUITĂ!" : `>>> V21-FIX <<< Vizita: ${finalStamps}/5`, 
         debug: shellyLog 
       })
     };
@@ -135,7 +112,7 @@ exports.handler = async (event) => {
     return {
       statusCode: 200,
       headers,
-      body: JSON.stringify({ status: "error", message: err.message, debug: "v20-err" })
+      body: JSON.stringify({ status: "error", message: err.message, debug: "v21-error" })
     };
   }
 };
