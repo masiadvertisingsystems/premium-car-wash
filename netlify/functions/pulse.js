@@ -1,7 +1,7 @@
 /**
- * Logică Automatizare Premium Car Wash v6.1 - PRODUCTION READY
- * Strategie: Single Precision Shot (Evită max_req)
- * Status: CONFIGURATIE CONFIRMATA (max_req a dovedit conexiunea)
+ * Logică Automatizare Premium Car Wash v6.2 - LEGACY FALLBACK FORCE
+ * Strategie: Revenire la metoda /device/relay/0 care a generat 'max_req' (dovada conexiunii)
+ * Server: 232-EU | Device: cc7b5c0a2538
  */
 
 exports.handler = async (event) => {
@@ -62,7 +62,7 @@ exports.handler = async (event) => {
       })
     });
 
-    // 3. TRIGGER SHELLY (Single Shot - Production Mode)
+    // 3. TRIGGER SHELLY (FORCE LEGACY ENDPOINT)
     let finalStatus = "Inactiv";
     
     if (isFreeWash) {
@@ -77,22 +77,22 @@ exports.handler = async (event) => {
         if (!authKey || !cid) {
            finalStatus = "ERR_CHEI_LIPSA_URL";
         } else {
-            const rpcUrl = `${serverOrigin}/device/rpc`;
+            // FORȚĂM calea care știm că există (/device/relay/0)
+            // Aceasta este calea care a dat max_req, deci știm că serverul o acceptă
+            const legacyUrl = `${serverOrigin}/device/relay/0`;
             
-            // Trimitem O SINGURĂ cerere pe Canalul 0 (Standard)
-            // Aceasta previne eroarea 'max_req' în viitor
             const params = new URLSearchParams();
             params.append('auth_key', authKey);
             params.append('id', cid);
-            params.append('method', 'Switch.Set');
-            params.append('params', JSON.stringify({ id: 0, on: true, toggle_after: 240 }));
+            params.append('turn', 'on');
+            params.append('timer', '240'); // 4 minute
 
-            console.log("Executare Single-Shot RPC...");
-            const res = await fetch(rpcUrl, { method: 'POST', body: params });
+            console.log("Executare Legacy POST (Revenire la calea sigura)...");
+            const res = await fetch(legacyUrl, { method: 'POST', body: params });
             const json = await res.json();
 
-            if (json.isok === true || (json.result && json.result.was_on !== undefined)) {
-                finalStatus = "SUCCES_HARDWARE_ACTIVAT";
+            if (json.isok === true) {
+                finalStatus = "SUCCES_HARDWARE_LEGACY";
             } else if (json.errors && json.errors.max_req) {
                  finalStatus = "SERVER_BLOCAT_TEMPORAR (Asteapta 15 min)";
             } else {
