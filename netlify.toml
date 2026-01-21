@@ -1,22 +1,16 @@
-# Netlify Configuration - Versiunea v36.2 [ENGINE-SYNC]
-# Acest fișier asigură că apelurile către /api/engine sunt redirecționate corect.
+# Netlify Configuration - Versiunea v36.3 [STRICT-COMPATIBLE]
+# Am eliminat sectiunea [functions] care cauza eroarea de parsing pe imaginea 'noble'.
 
 [build]
   # Folderul unde Netlify caută funcțiile serverless
   functions = "netlify/functions"
   
-  # Directorul de publicare (unde se află index.html)
+  # Directorul de publicare (rădăcina unde se află index.html)
   publish = "."
 
 # REGULI DE REDIRECȚIONARE
 [[redirects]]
-  # Redirecționează orice apel de tip /api/engine către funcția fizică
+  # Redirecționează orice apel de tip /api/nume-functie către funcția corespunzătoare
   from = "/api/*"
   to = "/.netlify/functions/:splat"
   status = 200
-
-[functions]
-  # Forțăm bundling-ul pentru a include toate dependințele necesare (fetch, etc.)
-  node_bundle = true
-  # Setăm o versiune stabilă de Node.js
-  node_version = "20"
