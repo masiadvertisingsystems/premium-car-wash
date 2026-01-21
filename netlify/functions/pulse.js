@@ -1,7 +1,7 @@
 /**
- * Logică Automatizare Premium Car Wash v22.0 - CRITICAL CACHE BUSTER
+ * Logică Automatizare Premium Car Wash v24.0 - CACHE BUSTER & TIMESTAMP
  * Status: ID cc7b5c0a2538 CONFIRMAT | Server 232-eu CONFIRMAT
- * Modificări: Schimbare RADICALĂ de mesaj pentru a verifica deploy-ul.
+ * Modificări: Mesaj cu [V24-NEW] și Timp curent pentru a confirma deploy-ul.
  */
 
 exports.handler = async (event) => {
@@ -10,7 +10,7 @@ exports.handler = async (event) => {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Headers": "Content-Type, Cache-Control",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Cache-Control": "no-cache, no-store, must-revalidate" // Forțăm browserul să nu memoreze răspunsul
+    "Cache-Control": "no-cache, no-store, must-revalidate"
   };
 
   if (event.httpMethod === "OPTIONS") return { statusCode: 204, headers, body: "" };
@@ -22,6 +22,7 @@ exports.handler = async (event) => {
     if (!nr_inmatriculare) throw new Error("Lipsă număr.");
     
     const plateId = nr_inmatriculare.toUpperCase().replace(/\s+/g, '');
+    const now = new Date().toLocaleTimeString('ro-RO');
     
     // CONFIG HARDCODED
     const shellyBaseUrl = "https://shelly-232-eu.shelly.cloud/device/rpc";
@@ -42,7 +43,7 @@ exports.handler = async (event) => {
     const getRes = await fetch(fbUrl);
     const userData = await getRes.json();
     
-    let activeStamps = 1; // Default pentru client nou
+    let activeStamps = 1; 
     let isFreeWash = false;
     let dbMethod = "POST";
 
@@ -51,20 +52,17 @@ exports.handler = async (event) => {
       let current = 0;
       const field = userData.fields.stampile_active;
       if (field) {
-          current = parseInt(field.integerValue || field.stringValue || "0");
+          const val = field.integerValue || field.stringValue || "0";
+          current = parseInt(val);
       }
-      
       activeStamps = isNaN(current) ? 1 : current + 1;
-      
       if (activeStamps >= 5) {
         isFreeWash = true;
         activeStamps = 0; 
       }
     }
 
-    // Salvăm forțat ca String pentru a evita orice eroare de tip
     const finalCount = String(activeStamps);
-
     const saveUrl = (dbMethod === "PATCH") ? `${fbUrl}?updateMask.fieldPaths=stampile_active` : fbUrl.replace(`/${plateId}`, `?documentId=${plateId}`);
     
     await fetch(saveUrl, {
@@ -94,15 +92,14 @@ exports.handler = async (event) => {
       shellyLog = await resS.text();
     }
 
-    // Dacă vezi "ÎNREGISTRATĂ" pe ecran, înseamnă că acest cod NU a fost instalat!
+    // DACĂ VEZI "ÎNREGISTRATĂ", NU RULEZI ACEST COD!
     return {
       statusCode: 200,
       headers,
       body: JSON.stringify({ 
         status: "success", 
-        message: isFreeWash ? "🔥 SPĂLARE GRATUITĂ!" : `[STATUS V22] Vizite: ${finalCount} din 5`, 
-        version: "22.0",
-        debug: shellyLog 
+        message: isFreeWash ? "🔥 CADOU ACTIVAT!" : `[V24-NEW] Vizite: ${finalCount}/5`, 
+        debug: `Ora: ${now} | Shelly: ${shellyLog}` 
       })
     };
 
@@ -110,7 +107,7 @@ exports.handler = async (event) => {
     return {
       statusCode: 200,
       headers,
-      body: JSON.stringify({ status: "error", message: err.message, debug: "v22-critical-err" })
+      body: JSON.stringify({ status: "error", message: "Eroare v24", debug: err.message })
     };
   }
 };
