@@ -10,13 +10,16 @@
         body { font-family: 'Inter', sans-serif; background-color: #020617; }
         .glass { background: rgba(15, 23, 42, 0.9); backdrop-filter: blur(16px); }
         .input-glow:focus { box-shadow: 0 0 15px rgba(14, 165, 233, 0.2); }
+        .animate-flicker { animation: flicker 2s infinite; }
+        @keyframes flicker { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+        .btn-active:active { transform: scale(0.98); }
     </style>
 </head>
 <body class="text-white min-h-screen flex items-center justify-center p-4">
     <div class="w-full max-w-md glass rounded-[2.5rem] p-10 border border-white/10 shadow-2xl">
         <div class="text-center mb-10">
             <h1 class="text-3xl font-black tracking-tight text-sky-500 uppercase">PREMIUM WASH</h1>
-            <p class="text-slate-400 text-xs mt-2 font-mono uppercase tracking-[0.2em]">Sistem Automat v37.0</p>
+            <p class="text-slate-400 text-xs mt-2 font-mono uppercase tracking-[0.2em]">Sistem Automat v37.1</p>
         </div>
 
         <form id="loyaltyForm" class="space-y-6">
@@ -33,15 +36,15 @@
             </div>
 
             <button type="submit" id="submitBtn" 
-                class="w-full bg-sky-600 hover:bg-sky-500 p-5 rounded-2xl font-black text-xl uppercase shadow-lg shadow-sky-900/20 transition-all active:scale-95 disabled:opacity-50">
+                class="w-full bg-sky-600 hover:bg-sky-500 p-5 rounded-2xl font-black text-xl uppercase shadow-lg shadow-sky-900/20 transition-all btn-active disabled:opacity-50">
                 Înregistrează Vizita
             </button>
         </form>
 
-        <div id="statusMessage" class="mt-8 text-center min-h-[5rem] flex flex-col items-center justify-center"></div>
+        <div id="statusMessage" class="mt-8 text-center min-h-[6rem] flex flex-col items-center justify-center"></div>
         
         <div class="mt-6 pt-6 border-t border-white/5 text-center">
-            <p class="text-[10px] text-slate-600 uppercase font-bold tracking-widest">Digital Loyalty System &copy; 2026</p>
+            <p class="text-[10px] text-slate-600 uppercase font-bold tracking-widest italic">Drumul spre 1.000.000€ începe aici</p>
         </div>
     </div>
 
@@ -52,7 +55,7 @@
             const msg = document.getElementById('statusMessage');
             
             btn.disabled = true;
-            btn.innerText = "CONECTARE...";
+            btn.innerText = "PROCESARE...";
             msg.innerHTML = "";
 
             try {
@@ -66,22 +69,50 @@
                 });
 
                 if (!response.ok) {
-                    throw new Error(`Eroare Server (Cod: ${response.status})`);
+                    throw new Error(`Eroare Retea (Cod: ${response.status})`);
                 }
 
                 const data = await response.json();
                 
                 if (data.status === "success") {
-                    msg.innerHTML = `
-                        <div class="text-sky-400 text-2xl font-black tracking-tighter animate-pulse">${data.message}</div>
-                        <div class="text-slate-500 text-[10px] mt-2 uppercase font-bold tracking-widest opacity-60">${data.info || ''}</div>
-                    `;
-                    document.getElementById('plate').value = "";
+                    const isFree = data.message.includes("GRATUIT");
+                    const isLimit = data.info && data.info.includes("Rate Limit");
+
+                    if (isLimit) {
+                        msg.innerHTML = `
+                            <div class="text-amber-400 text-xl font-black uppercase tracking-tighter animate-pulse">Sistem Ocupat</div>
+                            <div class="text-slate-400 text-[10px] mt-2 uppercase font-bold tracking-widest leading-relaxed">
+                                REÎNCEARCĂ PESTE 60 SECUNDE<br>
+                                <span class="opacity-50 text-[8px]">(Protectie Shelly Cloud activată)</span>
+                            </div>
+                        `;
+                    } else {
+                        msg.innerHTML = `
+                            <div class="${isFree ? 'text-green-400' : 'text-sky-400'} text-2xl font-black tracking-tighter ${isFree ? 'animate-flicker' : ''}">
+                                ${data.message}
+                            </div>
+                            <div class="text-slate-500 text-[10px] mt-2 uppercase font-bold tracking-widest opacity-70">
+                                ${data.info || ''}
+                            </div>
+                        `;
+                    }
+                    
+                    if (!isLimit) {
+                        document.getElementById('plate').value = "";
+                    }
                 } else {
-                    msg.innerHTML = `<div class="text-red-400 font-bold bg-red-900/10 p-4 rounded-xl w-full border border-red-900/20">${data.message}</div>`;
+                    msg.innerHTML = `
+                        <div class="text-red-400 font-bold bg-red-900/10 p-4 rounded-xl w-full border border-red-900/20 text-sm">
+                            ${data.message}
+                        </div>
+                    `;
                 }
             } catch (err) {
-                msg.innerHTML = `<div class="text-red-500 font-black">CONEXIUNE EȘUATĂ</div>`;
+                console.error("Fetch Error:", err);
+                msg.innerHTML = `
+                    <div class="text-red-500 font-black text-lg uppercase tracking-tighter">Conexiune Întreruptă</div>
+                    <div class="text-slate-600 text-[9px] mt-1 font-mono">SERVER TIMEOUT - REÎNCEARCĂ IMEDIAT</div>
+                `;
             } finally {
                 btn.disabled = false;
                 btn.innerText = "Înregistrează Vizita";
