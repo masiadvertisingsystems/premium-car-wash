@@ -1,7 +1,7 @@
 /**
- * Logică Automatizare Premium Car Wash v24.0 - CACHE BUSTER & TIMESTAMP
+ * Logică Automatizare Premium Car Wash v25.0 - ULTIMATUM DEPLOY
  * Status: ID cc7b5c0a2538 CONFIRMAT | Server 232-eu CONFIRMAT
- * Modificări: Mesaj cu [V24-NEW] și Timp curent pentru a confirma deploy-ul.
+ * Modificări: Identificator [V25-ULTIMATUM] pentru confirmarea prezenței codului nou.
  */
 
 exports.handler = async (event) => {
@@ -16,15 +16,16 @@ exports.handler = async (event) => {
   if (event.httpMethod === "OPTIONS") return { statusCode: 204, headers, body: "" };
 
   try {
+    console.log("--- START FUNCTIE V25 ---");
+    
     if (!event.body) throw new Error("Lipsă date.");
     const bodyParams = JSON.parse(event.body);
     const { nr_inmatriculare } = bodyParams;
     if (!nr_inmatriculare) throw new Error("Lipsă număr.");
     
     const plateId = nr_inmatriculare.toUpperCase().replace(/\s+/g, '');
-    const now = new Date().toLocaleTimeString('ro-RO');
     
-    // CONFIG HARDCODED
+    // CONFIG HARDCODED (Fără variabile de mediu pentru a evita eroarea undefined)
     const shellyBaseUrl = "https://shelly-232-eu.shelly.cloud/device/rpc";
     const deviceID = "cc7b5c0a2538"; 
     const authKey = "M2M1YzY4dWlk2D1432348AD156ADC971DE839C20DAAD09B58D673106CE2B67A97A9C47F9ADA674C2C7B75B7A081F"; 
@@ -62,7 +63,9 @@ exports.handler = async (event) => {
       }
     }
 
+    // Conversie forțată la String pentru a fi siguri că nu e undefined
     const finalCount = String(activeStamps);
+
     const saveUrl = (dbMethod === "PATCH") ? `${fbUrl}?updateMask.fieldPaths=stampile_active` : fbUrl.replace(`/${plateId}`, `?documentId=${plateId}`);
     
     await fetch(saveUrl, {
@@ -92,14 +95,14 @@ exports.handler = async (event) => {
       shellyLog = await resS.text();
     }
 
-    // DACĂ VEZI "ÎNREGISTRATĂ", NU RULEZI ACEST COD!
+    // Mesajul V25: DACĂ VEZI "ÎNREGISTRATĂ", NU ESTE CODUL NOU!
     return {
       statusCode: 200,
       headers,
       body: JSON.stringify({ 
         status: "success", 
-        message: isFreeWash ? "🔥 CADOU ACTIVAT!" : `[V24-NEW] Vizite: ${finalCount}/5`, 
-        debug: `Ora: ${now} | Shelly: ${shellyLog}` 
+        message: isFreeWash ? "🔥 CADOU ACTIVAT!" : `[V25-ULTIMATUM] Vizite: ${finalCount} / 5`, 
+        debug: shellyLog 
       })
     };
 
@@ -107,7 +110,7 @@ exports.handler = async (event) => {
     return {
       statusCode: 200,
       headers,
-      body: JSON.stringify({ status: "error", message: "Eroare v24", debug: err.message })
+      body: JSON.stringify({ status: "error", message: "Eroare Versiune v25", debug: err.message })
     };
   }
 };
