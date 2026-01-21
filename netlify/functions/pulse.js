@@ -1,7 +1,7 @@
 /**
- * Logică Automatizare Premium Car Wash v16.0 - CONFIGURAȚIE VALIDATĂ & DEFENSIVĂ
+ * Logică Automatizare Premium Car Wash v17.0 - ALL-IN-ONE (NO ENV VARS)
  * Status: ID cc7b5c0a2538 CONFIRMAT | Server 232-eu CONFIRMAT | Cheie CONFIRMATĂ
- * Fix: Verificare variabile mediu pentru a preveni eroarea "Necunoscută"
+ * Fix: Configurația Firebase integrată direct pentru a elimina eroarea "Necunoscută"
  */
 
 exports.handler = async (event) => {
@@ -17,7 +17,7 @@ exports.handler = async (event) => {
   if (event.httpMethod === "OPTIONS") return { statusCode: 204, headers, body: "" };
 
   try {
-    // 1. VERIFICARE INPUT (Să nu crape dacă body e gol)
+    // 1. VERIFICARE INPUT
     if (!event.body) throw new Error("Nu s-au primit date (Body gol).");
     
     let bodyParams;
@@ -32,25 +32,27 @@ exports.handler = async (event) => {
     
     const plateId = nr_inmatriculare.toUpperCase().replace(/\s+/g, '');
     
-    // 2. VERIFICARE MEDIU (Să nu crape "Necunoscut" dacă lipsește config-ul)
-    if (!process.env.FIREBASE_CONFIG) {
-        throw new Error("Lipsește variabila FIREBASE_CONFIG în Netlify!");
-    }
-
-    // --- CONFIGURAȚIE SHELLY (HARDCODED PENTRU SIGURANȚĂ) ---
+    // 2. CONFIGURARE TOTALĂ (HARDCODED PENTRU STABILITATE MAXIMĂ)
+    // Am eliminat dependența de variabilele Netlify care cauzau erori.
+    
+    // A. CONFIGURARE SHELLY (Confirmată)
     const shellyBaseUrl = "https://shelly-232-eu.shelly.cloud/device/rpc";
     const deviceID = "cc7b5c0a2538"; 
     const authKey = "M2M1YzY4dWlk2D1432348AD156ADC971DE839C20DAAD09B58D673106CE2B67A97A9C47F9ADA674C2C7B75B7A081F"; 
 
-    // Parsare Config Firebase
-    let fbConfig;
-    try {
-        fbConfig = JSON.parse(process.env.FIREBASE_CONFIG);
-    } catch (e) {
-        throw new Error("Variabila FIREBASE_CONFIG nu este un JSON valid.");
-    }
+    // B. CONFIGURARE FIREBASE (Integrată direct)
+    const fbConfig = {
+        "apiKey": "AIzaSyDlzoN9-l_Gvk3ZV2sERlRNQux5QdoSYi4",
+        "authDomain": "premium-car-wash-systems.firebaseapp.com",
+        "databaseURL": "https://premium-car-wash-systems-default-rtdb.europe-west1.firebasedatabase.app",
+        "projectId": "premium-car-wash-systems",
+        "storageBucket": "premium-car-wash-systems.firebasestorage.app",
+        "messagingSenderId": "1066804021666",
+        "appId": "1:1066804021666:web:9494cf947ea14502758afb"
+    };
     
     // 3. FIREBASE: Căutare Client
+    // Folosim direct projectId din obiectul hardcodat
     const fbUrl = `https://firestore.googleapis.com/v1/projects/${fbConfig.projectId}/databases/(default)/documents/artifacts/premium-car-wash/public/data/loyalty/${plateId}`;
     
     let getRes, userData;
@@ -94,7 +96,7 @@ exports.handler = async (event) => {
     // 5. SHELLY TRIGGER (MOMENTUL ADEVĂRULUI)
     let shellyLog = "N/A";
     if (isFreeWash) {
-      // Parametrii pentru Switch:0 (văzut în JSON-ul tău)
+      // Parametrii pentru Switch:0 (văzut în JSON-ul tău de diagnostic)
       const rpcParams = JSON.stringify({ id: 0, on: true, toggle_after: 5 });
       
       const postData = new URLSearchParams();
