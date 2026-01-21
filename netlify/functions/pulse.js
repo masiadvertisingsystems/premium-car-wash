@@ -1,7 +1,7 @@
 /**
- * Logică Automatizare Premium Car Wash v17.0 - ALL-IN-ONE (NO ENV VARS)
+ * Logică Automatizare Premium Car Wash v18.0 - ROBUST STAMP COUNTING
  * Status: ID cc7b5c0a2538 CONFIRMAT | Server 232-eu CONFIRMAT | Cheie CONFIRMATĂ
- * Fix: Configurația Firebase integrată direct pentru a elimina eroarea "Necunoscută"
+ * Fix: Tratare "undefined" la citirea ștampilelor (suportă și stringValue și integerValue)
  */
 
 exports.handler = async (event) => {
@@ -33,8 +33,6 @@ exports.handler = async (event) => {
     const plateId = nr_inmatriculare.toUpperCase().replace(/\s+/g, '');
     
     // 2. CONFIGURARE TOTALĂ (HARDCODED PENTRU STABILITATE MAXIMĂ)
-    // Am eliminat dependența de variabilele Netlify care cauzau erori.
-    
     // A. CONFIGURARE SHELLY (Confirmată)
     const shellyBaseUrl = "https://shelly-232-eu.shelly.cloud/device/rpc";
     const deviceID = "cc7b5c0a2538"; 
@@ -52,7 +50,6 @@ exports.handler = async (event) => {
     };
     
     // 3. FIREBASE: Căutare Client
-    // Folosim direct projectId din obiectul hardcodat
     const fbUrl = `https://firestore.googleapis.com/v1/projects/${fbConfig.projectId}/databases/(default)/documents/artifacts/premium-car-wash/public/data/loyalty/${plateId}`;
     
     let getRes, userData;
@@ -72,9 +69,24 @@ exports.handler = async (event) => {
       activeStamps = 1;
       dbMethod = "POST";
     } else if (userData.fields) {
-      // Client existent
-      const current = parseInt(userData.fields.stampile_active?.integerValue || "0");
-      activeStamps = current + 1;
+      // Client existent - LOGICĂ ROBUSTĂ DE EXTRAGERE
+      let currentStamps = 0;
+      const rawField = userData.fields.stampile_active;
+      
+      if (rawField) {
+          // Verificăm ambele tipuri de date posibile din Firestore
+          if (rawField.integerValue) {
+              currentStamps = parseInt(rawField.integerValue);
+          } else if (rawField.stringValue) {
+              currentStamps = parseInt(rawField.stringValue);
+          }
+      }
+
+      // Protecție suplimentară împotriva NaN
+      if (isNaN(currentStamps)) currentStamps = 0;
+
+      activeStamps = currentStamps + 1;
+      
       if (activeStamps >= 5) {
         isFreeWash = true;
         activeStamps = 0; 
@@ -83,12 +95,16 @@ exports.handler = async (event) => {
 
     // 4. FIREBASE: Actualizare
     const saveUrl = (dbMethod === "PATCH") ? `${fbUrl}?updateMask.fieldPaths=stampile_active` : fbUrl.replace(`/${plateId}`, `?documentId=${plateId}`);
+    
+    // Asigurăm că trimitem un string valid către Firestore
+    const stampsToSend = (activeStamps !== undefined && activeStamps !== null) ? activeStamps.toString() : "0";
+
     await fetch(saveUrl, {
       method: dbMethod,
       body: JSON.stringify({
         fields: {
           nr_inmatriculare: { stringValue: plateId },
-          stampile_active: { integerValue: activeStamps.toString() }
+          stampile_active: { integerValue: stampsToSend }
         }
       })
     });
@@ -96,7 +112,6 @@ exports.handler = async (event) => {
     // 5. SHELLY TRIGGER (MOMENTUL ADEVĂRULUI)
     let shellyLog = "N/A";
     if (isFreeWash) {
-      // Parametrii pentru Switch:0 (văzut în JSON-ul tău de diagnostic)
       const rpcParams = JSON.stringify({ id: 0, on: true, toggle_after: 5 });
       
       const postData = new URLSearchParams();
@@ -117,14 +132,13 @@ exports.handler = async (event) => {
       shellyLog = resText;
       console.log(`[SHELLY] Response: ${resText}`);
 
-      // Verificăm dacă Shelly a dat eroare, chiar dacă fetch-ul a mers
       try {
           const shellyJson = JSON.parse(resText);
           if (!shellyJson.isok) {
               shellyLog = `REFUZAT: ${JSON.stringify(shellyJson.errors)}`;
           }
       } catch (e) {
-          // Ignorăm eroarea de parsare dacă nu e JSON
+          // Ignorăm eroarea de parsare
       }
     }
 
@@ -141,7 +155,7 @@ exports.handler = async (event) => {
   } catch (err) {
     console.error("CRITICAL ERROR:", err);
     return {
-      statusCode: 200, // Returnăm 200 ca să poată citi frontend-ul JSON-ul de eroare
+      statusCode: 200,
       headers,
       body: JSON.stringify({ status: "error", message: err.message || "Eroare Internă", debug: err.stack })
     };
