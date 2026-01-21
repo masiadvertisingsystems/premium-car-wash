@@ -1,6 +1,7 @@
 /**
- * Logică Automatizare Premium Car Wash v6.4 - LEGACY SNIPER
- * Strategie: Folosește exclusiv metoda Legacy (/device/relay/0) care a fost validată prin eroarea max_req.
+ * Logică Automatizare Premium Car Wash v6.5 - DIGITAL AUTOPSY
+ * Scop: Nu forțează Click-ul, ci cere raportul complet de stare (GetStatus).
+ * Obiectiv: Să vedem dacă dispozitivul are componenta "Switch" activă.
  * Server: 232-EU | Device: cc7b5c0a2538
  */
 
@@ -62,9 +63,9 @@ exports.handler = async (event) => {
       })
     });
 
-    // 3. TRIGGER SHELLY (LEGACY SNIPER)
+    // 3. TRIGGER SHELLY (AUTOPSIE DIGITALĂ)
     let finalStatus = "Inactiv";
-    let debugLog = "";
+    let debugData = "";
     
     if (isFreeWash) {
       const originalUrl = process.env.SHELLY_IP.trim();
@@ -78,19 +79,18 @@ exports.handler = async (event) => {
         if (!authKey || !cid) {
            finalStatus = "ERR_CHEI_LIPSA_URL";
         } else {
-            // TINTIM DIRECT ENDPOINT-UL CARE A RASPUNS (chiar daca cu max_req)
-            const legacyUrl = `${serverOrigin}/device/relay/0`;
+            const rpcUrl = `${serverOrigin}/device/rpc`;
             
+            // Cerem STATUS, nu acțiune. Această metodă există pe ORICE dispozitiv Shelly.
+            // Dacă și asta dă 404, dispozitivul e deconectat de la cont.
             const params = new URLSearchParams();
             params.append('auth_key', authKey);
             params.append('id', cid);
-            params.append('turn', 'on');
-            params.append('timer', '240'); // 4 minute
+            params.append('method', 'Shelly.GetStatus'); // Metoda universală
 
-            console.log(`Trimite LEGACY POST către ${legacyUrl}`);
+            console.log(`Diagnosticul Shelly pornit pentru ID: ${cid}`);
 
-            // Un singur apel, curat, fara retry, pentru a nu bloca serverul
-            const res = await fetch(legacyUrl, {
+            const res = await fetch(rpcUrl, {
                 method: 'POST',
                 body: params,
                 signal: AbortSignal.timeout(12000)
@@ -98,12 +98,13 @@ exports.handler = async (event) => {
             
             const json = await res.json();
 
-            if (json.isok === true) {
-                finalStatus = "SUCCES_HARDWARE_ACTIVAT";
-            } else if (json.errors && json.errors.max_req) {
-                 finalStatus = "⚠️ SERVER BLOCAT (Asteapta 15 min)";
+            if (json.isok === true || (json.result)) {
+                // Verificăm dacă există componenta SWITCH în răspuns
+                const hasSwitch = JSON.stringify(json).includes("switch:");
+                finalStatus = hasSwitch ? "CONECTAT_SWITCH_PREZENT" : "CONECTAT_DAR_FARA_SWITCH";
+                debugData = JSON.stringify(json).substring(0, 200); // Primele 200 caractere
             } else {
-                finalStatus = `ERR_SHELLY: ${JSON.stringify(json)}`;
+                finalStatus = `ERR_SHELLY_DIAGNOSTIC: ${JSON.stringify(json)}`;
             }
         }
       } catch (e) {
@@ -118,9 +119,9 @@ exports.handler = async (event) => {
         status: "success", 
         activeStamps, 
         isFreeWash, 
-        message: isFreeWash ? "SPĂLARE GRATUITĂ ACTIVATĂ!" : `VIZITA ${activeStamps}/5 CONFIRMATĂ.`,
+        message: isFreeWash ? "DIAGNOSTIC FINALIZAT" : `VIZITA ${activeStamps}/5 CONFIRMATĂ.`,
         shellyStatus: String(finalStatus),
-        debug: String(debugLog + finalStatus)
+        debug: String(debugData || finalStatus)
       })
     };
 
