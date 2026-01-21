@@ -1,52 +1,141 @@
-# SCRIPT DE LANSARE OFICIALĂ v37.4 [ANTI-CACHE & DEEP DIAGNOSTIC]
-# Obiectiv: Declanșarea releului și forțarea serverului să renunțe la versiunile vechi.
+/**
+ * Motor de Automatizare Premium Car Wash - Versiunea v37.4 [ULTIMATE-FIX]
+ * Status: ID cc7b5c0a2538 | Server 232-eu
+ * Obiectiv: Maximizare profit, eliminare erori de comunicare hardware.
+ */
 
-# Adăugăm un parametru de timp pentru a păcăli orice sistem de cache (Cache-Busting)
-$timestamp = Get-Date -Format "yyyyMMddHHmmss"
-$url = "https://69710f4aee5aa5429dc3c012--premium-car-wash.netlify.app/api/engine?t=$timestamp"
+exports.handler = async (event) => {
+  // Headere pentru securitate și eliminarea erorilor de conexiune în browser (CORS)
+  const headers = {
+    "Content-Type": "application/json",
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Cache-Control": "no-cache, no-store, must-revalidate"
+  };
 
-$numarUnic = "B" + (Get-Random -Minimum 100 -Maximum 999) + "CASH"
+  // Gestionare pre-flight request (verificarea de securitate a browserului)
+  if (event.httpMethod === "OPTIONS") return { statusCode: 204, headers, body: "" };
 
-Write-Host "🚀 PORNIRE TEST v37.4 (FORȚARE REFRESH) PENTRU: $numarUnic" -ForegroundColor Cyan
-Write-Host "----------------------------------------------------"
+  try {
+    // 1. ANALIZĂ DATE INTRARE
+    if (!event.body) throw new Error("Date primite lipsă.");
+    const body = JSON.parse(event.body);
+    const nrAuto = body.nr_inmatriculare ? body.nr_inmatriculare.toUpperCase().replace(/\s+/g, '') : "ANONIM";
 
-for ($i = 1; $i -le 5; $i++) {
-    $body = @{ nr_inmatriculare = $numarUnic; telefon = "0700000000" } | ConvertTo-Json
-    Write-Host "🔄 Pasul $i/5..." -NoNewline
+    if (nrAuto === "ANONIM") throw new Error("Număr de înmatriculare nevalid.");
+
+    // 2. CONFIGURAȚIE CLOUD (Sursa de Adevăr)
+    const projectId = "premium-car-wash-systems";
+    const apiKey = "AIzaSyDlzoN9-l_Gvk3ZV2sERlRNQux5QdoSYi4";
+    const shellyUrl = "https://shelly-232-eu.shelly.cloud/device/rpc";
     
-    try {
-        # Trimitem headere anti-cache direct din PowerShell
-        $headers = @{ "Cache-Control" = "no-cache"; "Pragma" = "no-cache" }
-        $res = Invoke-WebRequest -Uri $url -Method Post -Body $body -ContentType "application/json" -Headers $headers -UseBasicParsing -ErrorAction Stop
-        $json = $res.Content | ConvertFrom-Json
-        
-        # VERIFICARE CRITICĂ VERSIUNE (Analiza decalajului GitHub-Netlify)
-        if ($json.message -like "*[v33]*") {
-            Write-Host "`n❌ EROARE: SERVERUL ESTE BLOCAT PE [v33]!" -ForegroundColor Red
-            Write-Host "👉 Buba: Deși tu ai v36 în editor, Netlify NU a reușit să facă deploy-ul." -ForegroundColor Yellow
-            Write-Host "👉 Verifică în Netlify la 'Deploys' dacă ultimul build a dat 'Failed'." -ForegroundColor White
-            break
-        }
+    // AuthKey corect pentru serverul 232-eu
+    const authKey = "M2M1YzY4dWlk-1432348AD156ADC971DE839C20DAAD09B58D673106CE2B67A97A9C47F9ADA674C2C7B75B7A081F";
 
-        if ($i -lt 5) {
-            Write-Host " ✅ OK ($($json.message))" -ForegroundColor Green
-        } else {
-            Write-Host "`n🔥 MOMENTUL ADEVĂRULUI: $($json.message)" -ForegroundColor Magenta
-            if ($json.info -like "*ACTIVAT*") {
-                Write-Host "📢 REZULTAT: SUCCESS! RELEUL A FOST ACTIVAT." -ForegroundColor Green
-                Write-Host "💰 SISTEMUL ESTE GATA SĂ GENEREZE PROFIT!" -ForegroundColor Cyan
-            } else {
-                Write-Host "📢 REZULTAT: $($json.info)" -ForegroundColor Yellow
-                if ($json.info -like "*max_req*" -or $json.info -like "*limit*") {
-                    Write-Host "⚠️ Shelly te-a blocat temporar (Rate Limit). Oprește testele 10 minute!" -ForegroundColor Red
-                }
-            }
-        }
-    } catch {
-        Write-Host " ❌ EROARE CONEXIUNE - Verifică dacă site-ul e online." -ForegroundColor Red
-        break
+    // 3. FIREBASE: CITIRE STATUS LOIALITATE (Cale publică securizată)
+    const fbUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/artifacts/premium-car-wash/public/data/loyalty/${nrAuto}?key=${apiKey}`;
+
+    const responseFB = await fetch(fbUrl);
+    const dataFB = await responseFB.json();
+
+    let activeStamps = 0;
+    let isFreeWash = false;
+    let dbMethod = "PATCH";
+
+    if (dataFB.fields) {
+      // Client existent: procesăm numărul de ștampile
+      const field = dataFB.fields.stampile_active;
+      let current = parseInt(field?.integerValue || field?.stringValue || "0");
+      
+      activeStamps = isNaN(current) ? 1 : current + 1;
+      
+      if (activeStamps >= 5) {
+        isFreeWash = true;
+        activeStamps = 0; // Resetăm pentru următorul ciclu de profit
+      }
+    } else {
+      // Client nou: înregistrăm prima vizită
+      activeStamps = 1;
+      dbMethod = "POST";
     }
-    Start-Sleep -Seconds 1
-}
 
-Write-Host "----------------------------------------------------"
+    const countStr = String(activeStamps);
+    
+    // 4. FIREBASE: SALVARE STATUS ACTUALIZAT
+    const writeUrl = (dbMethod === "PATCH") 
+        ? `${fbUrl}&updateMask.fieldPaths=stampile_active` 
+        : `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/artifacts/premium-car-wash/public/data/loyalty?documentId=${nrAuto}&key=${apiKey}`;
+
+    await fetch(writeUrl, {
+      method: dbMethod,
+      body: JSON.stringify({
+        fields: {
+          nr_inmatriculare: { stringValue: nrAuto },
+          stampile_active: { integerValue: countStr }
+        }
+      })
+    });
+
+    // 5. LOGICA SHELLY DUAL-ATTEMPT (v37.4)
+    // Încercăm ambele formate de ID pentru a garanta execuția și gestionăm limitele serverului
+    let shellyLog = "N/A";
+    if (isFreeWash) {
+      const idsToTry = ["cc7b5c0a2538", "shellyplusuni-cc7b5c0a2538"];
+      
+      for (const currentId of idsToTry) {
+        try {
+          const postData = new URLSearchParams();
+          postData.append('id', currentId);
+          postData.append('auth_key', authKey);
+          postData.append('method', 'Switch.Set');
+          postData.append('params', JSON.stringify({ id: 0, on: true, toggle_after: 5 }));
+
+          const resS = await fetch(shellyUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: postData.toString()
+          });
+          
+          const resText = await resS.text();
+          const resJson = JSON.parse(resText);
+
+          if (resJson.isok) {
+            shellyLog = `ACTIVAT (ID: ${currentId})`;
+            break; 
+          } else {
+            // Dacă primim eroare de limitare cereri (max_req)
+            if (resJson.errors && resJson.errors.max_req) {
+              shellyLog = "SISTEM OCUPAT (Rate Limit). Reîncearcă în 60 sec.";
+              break; 
+            }
+            shellyLog = `FAIL: ${resText.substring(0, 40)}`;
+          }
+        } catch (e) {
+          shellyLog = `ERR: ${e.message}`;
+        }
+      }
+    }
+
+    // 6. RĂSPUNS FINAL CATRE INTERFAȚĂ / POWERSHELL
+    return {
+      statusCode: 200,
+      headers,
+      body: JSON.stringify({
+        status: "success",
+        message: isFreeWash ? "🎁 GRATUIT ACTIVAT!" : `VIZITA: ${countStr} / 5 [v37.4]`,
+        info: `Status Shelly: ${shellyLog}`
+      })
+    };
+
+  } catch (err) {
+    return {
+      statusCode: 200,
+      headers,
+      body: JSON.stringify({ 
+        status: "error", 
+        message: "Eroare: " + err.message 
+      })
+    };
+  }
+};
