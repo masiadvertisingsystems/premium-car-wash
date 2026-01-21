@@ -1,16 +1,11 @@
-# Netlify Configuration - Versiunea v36.3 [STRICT-COMPATIBLE]
-# Am eliminat sectiunea [functions] care cauza eroarea de parsing pe imaginea 'noble'.
+# Netlify Configuration - v37.2 [ULTRA-COMPATIBLE]
+# Aceasta versiune este simplificata la maxim pentru a trece de eroarea "noble".
 
 [build]
-  # Folderul unde Netlify caută funcțiile serverless
   functions = "netlify/functions"
-  
-  # Directorul de publicare (rădăcina unde se află index.html)
   publish = "."
 
-# REGULI DE REDIRECȚIONARE
 [[redirects]]
-  # Redirecționează orice apel de tip /api/nume-functie către funcția corespunzătoare
   from = "/api/*"
   to = "/.netlify/functions/:splat"
   status = 200
