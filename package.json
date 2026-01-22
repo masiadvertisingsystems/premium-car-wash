@@ -1,17 +1,11 @@
 {
-  "name": "premium-car-wash-api",
-  "version": "1.2.0",
-  "description": "Backend Ultra-Light pentru sistemul de fidelizare si automatizare Shelly Uni Plus",
-  "main": "index.js",
+  "name": "masi-pws-bridge",
+  "version": "1.0.0",
+  "description": "Bridge pentru activare Shelly Plus Uni",
+  "main": "index.html",
   "dependencies": {
-    "node-fetch": "^2.7.0"
+    "node-fetch": "^2.6.7"
   },
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "author": "Masi Advertising Systems",
-  "license": "MIT",
-  "engines": {
-    "node": ">=18.0.0"
-  }
+  "author": "Florin - MASI",
+  "license": "ISC"
 }
