@@ -1,123 +1,108 @@
-<!DOCTYPE html>
-<html lang="ro">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Premium Wash | Loialitate Digitală</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
-        body { font-family: 'Inter', sans-serif; background-color: #020617; }
-        .glass { background: rgba(15, 23, 42, 0.9); backdrop-filter: blur(16px); }
-        .input-glow:focus { box-shadow: 0 0 15px rgba(14, 165, 233, 0.2); }
-        .animate-flicker { animation: flicker 2s infinite; }
-        @keyframes flicker { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
-        .btn-active:active { transform: scale(0.98); }
-    </style>
-</head>
-<body class="text-white min-h-screen flex items-center justify-center p-4">
-    <div class="w-full max-w-md glass rounded-[2.5rem] p-10 border border-white/10 shadow-2xl">
-        <div class="text-center mb-10">
-            <h1 class="text-3xl font-black tracking-tight text-sky-500 uppercase">PREMIUM WASH</h1>
-            <p class="text-slate-400 text-xs mt-2 font-mono uppercase tracking-[0.2em]">Sistem Automat v37.1</p>
+import React, { useState } from 'react';
+import { Zap, Loader2, ShieldCheck, CheckCircle2, AlertTriangle, RefreshCcw } from 'lucide-react';
+
+/**
+ * MASI PWS - THE DASHBOARD
+ * Aceasta este consola de comanda a CEO-ului.
+ * Ocoleste CORS prin intermediul functiei Netlify.
+ */
+
+export default function App() {
+  const [status, setStatus] = useState('idle'); // 'idle', 'loading', 'success', 'error'
+  const [errorMsg, setErrorMsg] = useState('');
+
+  const executeClick = async () => {
+    setStatus('loading');
+    setErrorMsg('');
+
+    try {
+      const response = await fetch('/.netlify/functions/trigger-shelly', {
+        method: 'POST',
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setStatus('success');
+        // Resetam statusul dupa 3 secunde pentru a putea testa din nou
+        setTimeout(() => setStatus('idle'), 3000);
+      } else {
+        setStatus('error');
+        setErrorMsg(data.error || 'Eroare necunoscuta');
+      }
+    } catch (err) {
+      setStatus('error');
+      setErrorMsg('Nu am putut contacta serverul Netlify.');
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-[#050505] text-white flex flex-col items-center justify-center p-6 font-sans">
+      <div className="w-full max-w-sm">
+        {/* Header MASI */}
+        <div className="text-center mb-12">
+          <ShieldCheck className="w-16 h-16 mx-auto mb-4 text-sky-500" />
+          <h1 className="text-4xl font-black italic tracking-tighter uppercase leading-none">
+            MASI <span className="text-zinc-700 font-normal">PWS</span>
+          </h1>
+          <p className="text-[10px] font-bold tracking-[0.5em] text-zinc-500 uppercase mt-2">
+            Protocol de Executie v2.1
+          </p>
         </div>
 
-        <form id="loyaltyForm" class="space-y-6">
-            <div class="space-y-2">
-                <label class="text-[10px] font-black text-slate-500 ml-4 uppercase tracking-widest">Nr. Înmatriculare</label>
-                <input type="text" id="plate" placeholder="B 01 ABC" required 
-                    class="w-full bg-slate-900/50 p-5 rounded-2xl outline-none border border-white/5 text-2xl text-center uppercase font-black focus:border-sky-500 transition-all input-glow">
+        {/* Consola de Control */}
+        <div className="bg-zinc-900 border-2 border-zinc-800 p-8 rounded-[2rem] shadow-2xl relative overflow-hidden">
+          {/* Status Indicator */}
+          <div className="flex items-center justify-between mb-8">
+            <div className="flex items-center gap-2">
+              <div className={`w-2 h-2 rounded-full ${status === 'loading' ? 'bg-yellow-500 animate-pulse' : 'bg-green-500'}`}></div>
+              <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Sistem Online</span>
             </div>
-            
-            <div class="space-y-2">
-                <label class="text-[10px] font-black text-slate-500 ml-4 uppercase tracking-widest">Telefon</label>
-                <input type="tel" id="phone" placeholder="07xx xxx xxx" required 
-                    class="w-full bg-slate-900/50 p-5 rounded-2xl outline-none border border-white/5 text-center font-bold focus:border-sky-500 transition-all">
-            </div>
+            <span className="text-[10px] font-bold text-zinc-600 uppercase">Shelly Gen 2</span>
+          </div>
 
-            <button type="submit" id="submitBtn" 
-                class="w-full bg-sky-600 hover:bg-sky-500 p-5 rounded-2xl font-black text-xl uppercase shadow-lg shadow-sky-900/20 transition-all btn-active disabled:opacity-50">
-                Înregistrează Vizita
-            </button>
-        </form>
+          {/* Display */}
+          <div className="h-40 flex flex-col items-center justify-center border-2 border-zinc-800 rounded-2xl mb-8 bg-black/50">
+            {status === 'idle' && <Zap className="w-12 h-12 text-zinc-700" />}
+            {status === 'loading' && <Loader2 className="w-12 h-12 text-sky-500 animate-spin" />}
+            {status === 'success' && (
+              <div className="text-center animate-bounce">
+                <CheckCircle2 className="w-12 h-12 text-green-500 mx-auto" />
+                <p className="text-green-500 font-black text-xs mt-2 uppercase tracking-tighter">Click Executat!</p>
+              </div>
+            )}
+            {status === 'error' && (
+              <div className="text-center p-4">
+                <AlertTriangle className="w-10 h-10 text-red-500 mx-auto mb-2" />
+                <p className="text-red-500 text-[10px] font-bold uppercase">{errorMsg}</p>
+              </div>
+            )}
+          </div>
 
-        <div id="statusMessage" class="mt-8 text-center min-h-[6rem] flex flex-col items-center justify-center"></div>
-        
-        <div class="mt-6 pt-6 border-t border-white/5 text-center">
-            <p class="text-[10px] text-slate-600 uppercase font-bold tracking-widest italic">Drumul spre 1.000.000€ începe aici</p>
+          {/* Action Button */}
+          <button
+            onClick={executeClick}
+            disabled={status === 'loading'}
+            className={`w-full py-6 rounded-2xl font-black text-lg uppercase tracking-widest transition-all active:scale-95 shadow-lg ${
+              status === 'loading' 
+              ? 'bg-zinc-800 text-zinc-500' 
+              : 'bg-white text-black hover:bg-sky-500 hover:text-white shadow-sky-500/20'
+            }`}
+          >
+            {status === 'loading' ? 'Transmitere...' : 'Executa Click'}
+          </button>
         </div>
+
+        {/* Footer Realism Brutal */}
+        <div className="mt-12 text-center opacity-30">
+          <p className="text-[8px] font-bold tracking-[0.8em] uppercase mb-2">Masi Advertising Systems</p>
+          <div className="h-[1px] w-full bg-gradient-to-r from-transparent via-zinc-500 to-transparent"></div>
+          <p className="text-[8px] font-medium mt-2 italic text-zinc-400 leading-relaxed">
+            Acesta este motorul tau de 1 milion de euro. <br/>
+            Fiecare click este o validare a imperiului.
+          </p>
+        </div>
+      </div>
     </div>
-
-    <script>
-        document.getElementById('loyaltyForm').onsubmit = async (e) => {
-            e.preventDefault();
-            const btn = document.getElementById('submitBtn');
-            const msg = document.getElementById('statusMessage');
-            
-            btn.disabled = true;
-            btn.innerText = "PROCESARE...";
-            msg.innerHTML = "";
-
-            try {
-                const response = await fetch('/api/engine', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        nr_inmatriculare: document.getElementById('plate').value,
-                        telefon: document.getElementById('phone').value 
-                    })
-                });
-
-                if (!response.ok) {
-                    throw new Error(`Eroare Retea (Cod: ${response.status})`);
-                }
-
-                const data = await response.json();
-                
-                if (data.status === "success") {
-                    const isFree = data.message.includes("GRATUIT");
-                    const isLimit = data.info && data.info.includes("Rate Limit");
-
-                    if (isLimit) {
-                        msg.innerHTML = `
-                            <div class="text-amber-400 text-xl font-black uppercase tracking-tighter animate-pulse">Sistem Ocupat</div>
-                            <div class="text-slate-400 text-[10px] mt-2 uppercase font-bold tracking-widest leading-relaxed">
-                                REÎNCEARCĂ PESTE 60 SECUNDE<br>
-                                <span class="opacity-50 text-[8px]">(Protectie Shelly Cloud activată)</span>
-                            </div>
-                        `;
-                    } else {
-                        msg.innerHTML = `
-                            <div class="${isFree ? 'text-green-400' : 'text-sky-400'} text-2xl font-black tracking-tighter ${isFree ? 'animate-flicker' : ''}">
-                                ${data.message}
-                            </div>
-                            <div class="text-slate-500 text-[10px] mt-2 uppercase font-bold tracking-widest opacity-70">
-                                ${data.info || ''}
-                            </div>
-                        `;
-                    }
-                    
-                    if (!isLimit) {
-                        document.getElementById('plate').value = "";
-                    }
-                } else {
-                    msg.innerHTML = `
-                        <div class="text-red-400 font-bold bg-red-900/10 p-4 rounded-xl w-full border border-red-900/20 text-sm">
-                            ${data.message}
-                        </div>
-                    `;
-                }
-            } catch (err) {
-                console.error("Fetch Error:", err);
-                msg.innerHTML = `
-                    <div class="text-red-500 font-black text-lg uppercase tracking-tighter">Conexiune Întreruptă</div>
-                    <div class="text-slate-600 text-[9px] mt-1 font-mono">SERVER TIMEOUT - REÎNCEARCĂ IMEDIAT</div>
-                `;
-            } finally {
-                btn.disabled = false;
-                btn.innerText = "Înregistrează Vizita";
-            }
-        };
-    </script>
-</body>
-</html>
+  );
+}
