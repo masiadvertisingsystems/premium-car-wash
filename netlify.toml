@@ -1,11 +1,23 @@
-# Netlify Configuration - v37.2 [ULTRA-COMPATIBLE]
-# Aceasta versiune este simplificata la maxim pentru a trece de eroarea "noble".
+# MASI PWS - Netlify Configuration File
+# Acest fisier asigura comunicarea intre Frontend si functia de "Click"
 
 [build]
+  # Spunem lui Netlify unde se afla "creierul" (functiile de backend)
   functions = "netlify/functions"
-  publish = "."
+
+[functions]
+  # Folosim esbuild pentru o viteza de executie maxima
+  # (Reduce timpul de "pornire" al functiei, asigurand click-ul instant)
+  node_bundler = "esbuild"
 
 [[redirects]]
+  # Simplificam link-ul de apelare pentru frontend
+  # In loc de /.netlify/functions/trigger-shelly, poti folosi /api/trigger-shelly
   from = "/api/*"
   to = "/.netlify/functions/:splat"
   status = 200
+
+[dev]
+  # Setari pentru testarea locala (daca folosesti Netlify CLI)
+  functions = "netlify/functions"
+  publish = "."
