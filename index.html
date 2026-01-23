@@ -60,11 +60,12 @@
             return <i data-lucide={name} className={className}></i>;
         };
 
-        const Toast = ({ message, onClose }) => {
+        const Toast = ({ message, type = 'success', onClose }) => {
             useEffect(() => { const timer = setTimeout(onClose, 3000); return () => clearTimeout(timer); }, [onClose]);
+            const isError = type === 'error';
             return (
-                <div className="fixed top-4 right-4 z-[100] flex items-center gap-3 px-4 py-3 rounded-xl border border-emerald-500/50 bg-emerald-500/10 backdrop-blur-md shadow-2xl toast-enter text-emerald-200">
-                    <Icon name="check-circle" className="w-5 h-5 shrink-0" />
+                <div className={`fixed top-4 right-4 z-[100] flex items-center gap-3 px-4 py-3 rounded-xl border backdrop-blur-md shadow-2xl toast-enter ${isError ? 'border-red-500/50 bg-red-500/10 text-red-200' : 'border-emerald-500/50 bg-emerald-500/10 text-emerald-200'}`}>
+                    <Icon name={isError ? "alert-triangle" : "check-circle"} className="w-5 h-5 shrink-0" />
                     <p className="text-xs font-bold uppercase tracking-wide">{message}</p>
                 </div>
             );
@@ -94,7 +95,9 @@
                             setBoxStatus(isOnline ? 'Online' : 'Offline');
                         });
                     } else {
-                        signInAnonymously(auth);
+                        signInAnonymously(auth).catch(err => {
+                            setToast({ message: "Eroare Securitate Firebase!", type: 'error' });
+                        });
                     }
                 });
                 return () => unsubscribeAuth();
@@ -102,20 +105,16 @@
 
             useEffect(() => {
                 if (view !== 'dashboard' || !currentUser) return;
-
                 const tokensRef = ref(rtdb, `artifacts/${appId}/public/data/telemetry/${BOX_ID}/pending_tokens`);
                 
                 const unsubscribeTokens = onValue(tokensRef, async (snapshot) => {
                     const tokens = snapshot.val();
-                    
                     if (tokens > 0 && !isProcessing.current) {
                         isProcessing.current = true;
                         try {
                             const cleanPlate = plate.toUpperCase().replace(/\s/g, '');
-                            
                             const collectionPath = collection(db, 'artifacts', appId, 'public', 'data', 'comenzi_spalare');
-                            const q = query(collectionPath, where("nr_inmatriculare", "==", cleanPlate), where("status", "==", "completed"));
-                            const currentSnap = await getDocs(q);
+                            const currentSnap = await getDocs(query(collectionPath, where("nr_inmatriculare", "==", cleanPlate), where("status", "==", "completed")));
                             const currentVisits = currentSnap.size % 5;
                             const nextStamps = (currentVisits + 1) > 5 ? 1 : (currentVisits + 1);
 
@@ -127,15 +126,16 @@
                                 "numar telefon": phone,
                                 "user agent": navigator.userAgent,
                                 "status": "completed",
-                                "type": "physical_wash"
+                                "type": "physical_wash",
+                                "uid": currentUser.uid // Adăugat pentru reguli de securitate
                             });
 
                             await set(tokensRef, 0); 
                             await refreshStats(cleanPlate);
-                            setToast({ message: "Vizită înregistrată!" });
-
-                        } catch (err) { console.error("Eroare Logare:", err); } 
-                        finally { isProcessing.current = false; }
+                            setToast({ message: "Vizită înregistrată!", type: 'success' });
+                        } catch (err) { 
+                            setToast({ message: "Eroare: Acces Refuzat!", type: 'error' });
+                        } finally { isProcessing.current = false; }
                     }
                 });
                 return () => unsubscribeTokens();
@@ -146,7 +146,7 @@
                 try {
                     const tokensRef = ref(rtdb, `artifacts/${appId}/public/data/telemetry/${BOX_ID}/pending_tokens`);
                     await set(tokensRef, 1); 
-                } catch (err) { console.error(err); }
+                } catch (err) { setToast({ message: "Simulare eșuată!", type: 'error' }); }
             };
 
             const refreshStats = async (cleanPlate) => {
@@ -165,8 +165,9 @@
                 try {
                     await refreshStats(cleanPlate);
                     setView('dashboard');
-                } catch (err) { console.error(err); } 
-                finally { setLoading(false); }
+                } catch (err) { 
+                    setToast({ message: "Eroare Bază de Date!", type: 'error' });
+                } finally { setLoading(false); }
             };
 
             const confirmAndStartWash = async () => {
@@ -185,17 +186,19 @@
                         "numar telefon": phone,
                         "user agent": navigator.userAgent,
                         "status": "completed",
-                        "type": "loyalty_bonus_redeemed"
+                        "type": "loyalty_bonus_redeemed",
+                        "uid": currentUser.uid
                     });
                     setView('success');
                     setTimeout(() => setUserStats({ visits: 0, nextIsFree: false }), 3000);
-                } catch (err) { console.error(err); } 
-                finally { setLoading(false); }
+                } catch (err) { 
+                    setToast({ message: "Eroare Activare Bonus!", type: 'error' });
+                } finally { setLoading(false); }
             };
 
             return (
                 <div className="luxury-bg min-h-screen flex flex-col items-center relative selection:bg-emerald-500/30">
-                    {toast && <Toast message={toast.message} onClose={() => setToast(null)} />}
+                    {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
                     
                     {view === 'dashboard' && (
                         <button 
@@ -301,7 +304,7 @@
                                <div className="space-y-4">
                                   <h2 className="text-5xl font-black italic uppercase tracking-tighter leading-none font-outfit">BONUS ACTIVAT!</h2>
                                   <p className="text-emerald-400 text-[10px] uppercase font-bold tracking-[0.2em] animate-pulse italic">Ați primit 4 minute timp liber.</p>
-                               </div>
+                                </div>
                                <button onClick={() => setView('auth')} className="bg-white/5 border border-white/10 px-10 py-5 rounded-full text-[10px] font-black uppercase italic tracking-widest active:scale-95 transition-all hover:bg-white/10">Înapoi</button>
                             </div>
                         )}
