@@ -1,357 +1,213 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { initializeApp } from 'firebase/app';
-import { 
-  getFirestore, collection, addDoc, query, where, getDocs, serverTimestamp 
-} from 'firebase/firestore';
-import { getDatabase, ref, set, onValue } from 'firebase/database';
-import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from 'firebase/auth';
-import { 
-  Zap, Car, Phone, Check, CheckCircle, Award, 
-  Gift, RefreshCw, Lock, PlusCircle, Activity 
-} from 'lucide-react';
-
-// --- CONFIGURAȚIA ACTUALIZATĂ (Sincronizată pe BELGIA) ---
-const firebaseConfig = {
-  apiKey: "AIzaSyDlzoN9-l_Gvk3ZV2sERlRNQux5QdoSYi4",
-  authDomain: "premium-car-wash-systems.firebaseapp.com",
-  projectId: "premium-car-wash-systems",
-  storageBucket: "premium-car-wash-systems.appspot.com",
-  messagingSenderId: "1066804021666",
-  appId: "1:1066804021666:web:9494cf947ea14502758afb",
-  // S-a schimbat din europe-west3 în europe-west1 pentru a vedea Shelly
-  databaseURL: "https://premium-car-wash-systems-default-rtdb.europe-west1.firebasedatabase.app"
-};
-
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-const rtdb = getDatabase(app);
-const auth = getAuth(app);
-
-const appId = 'premium_car_wash_systems'; 
-const BOX_ID = "OLT_BOX_01";
-
-export default function App() {
-  const [view, setView] = useState('auth');
-  const [plate, setPlate] = useState('');
-  const [phone, setPhone] = useState('');
-  const [gdpr, setGdpr] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [boxStatus, setBoxStatus] = useState('Se conectează...');
-  const [userStats, setUserStats] = useState({ visits: 0, nextIsFree: false });
-  const [safetyModal, setSafetyModal] = useState(false);
-  const [currentUser, setCurrentUser] = useState(null);
-
-  useEffect(() => {
-    const initAuth = async () => {
-      try {
-        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-          await signInWithCustomToken(auth, __initial_auth_token).catch(() => signInAnonymously(auth));
-        } else {
-          await signInAnonymously(auth);
-        }
-      } catch (err) {
-        console.error("Auth error:", err);
-      }
-    };
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>PWS Elite | Card Digital Fidelitate</title>
     
-    initAuth();
-    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
-      setCurrentUser(user);
-    });
+    <!-- INFRASTRUCTURĂ: Tailwind CSS, React, Firebase & Lucide -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@600;900&family=Plus+Jakarta+Sans:wght@400;500;700&display=swap" rel="stylesheet">
 
-    return () => unsubscribeAuth();
-  }, []);
-
-  useEffect(() => {
-    if (!currentUser) return;
-
-    // Monitorizare Heartbeat Shelly (Aliniat cu v1.6.1)
-    const heartbeatRef = ref(rtdb, `artifacts/${appId}/public/data/logs/${BOX_ID}/last_action`);
-    
-    const unsubscribeHeartbeat = onValue(heartbeatRef, (snapshot) => {
-      if (snapshot.exists()) {
-        const lastAction = snapshot.val();
-        // Extragere timestamp indiferent de formatul de stocare
-        const ts = typeof lastAction === 'object' ? (lastAction['$numberLong'] || Date.now()) : lastAction;
-        
-        // Dacă semnalul a venit în ultimele 60 de secunde, e Online
-        const isOnline = Math.abs(Date.now() - Number(ts)) < 60000;
-        setBoxStatus(isOnline ? 'Online' : 'Offline');
-      } else {
-        setBoxStatus('Offline');
-      }
-    }, (error) => {
-      setBoxStatus('Eroare Conexiune');
-      console.error("Sync error:", error);
-    });
-
-    return () => unsubscribeHeartbeat();
-  }, [currentUser]);
-
-  const handleLogin = async (e) => {
-    if (e) e.preventDefault();
-    if (!plate.trim() || !phone.trim() || !gdpr) return;
-    setLoading(true);
-
-    const cleanPlate = plate.toUpperCase().replace(/\s/g, '');
-    
-    try {
-      const collectionPath = collection(db, 'artifacts', appId, 'public', 'data', 'comenzi_spalare');
-      const q = query(collectionPath, where("numarInmatriculare", "==", cleanPlate), where("status", "==", "completed"));
-      const snap = await getDocs(q);
-      const count = snap.size % 5; 
-      setUserStats({ visits: count, nextIsFree: count === 4 });
-      setView('dashboard');
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const adminAddStamp = async () => {
-    setLoading(true);
-    try {
-      const cleanPlate = plate.toUpperCase().replace(/\s/g, '');
-      const collectionPath = collection(db, 'artifacts', appId, 'public', 'data', 'comenzi_spalare');
-      
-      await addDoc(collectionPath, {
-        numarInmatriculare: cleanPlate,
-        telefon: phone,
-        timestamp: serverTimestamp(),
-        status: "completed",
-        type: "admin_simulation"
-      });
-      
-      handleLogin(); // Refresh local data
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const confirmAndStartWash = async () => {
-    setSafetyModal(false);
-    setLoading(true);
-    
-    try {
-      const cleanPlate = plate.toUpperCase().replace(/\s/g, '');
-      const rtdbControlPath = ref(rtdb, `artifacts/${appId}/public/data/control/${BOX_ID}/inject_tokens`);
-      const firestoreCollectionPath = collection(db, 'artifacts', appId, 'public', 'data', 'comenzi_spalare');
-
-      // 1. Trimitem comanda către Shelly (Va fi preluată de v1.6.1)
-      await set(rtdbControlPath, 4);
-      
-      // 2. Logăm bonusul în Firestore
-      await addDoc(firestoreCollectionPath, {
-        numarInmatriculare: cleanPlate,
-        telefon: phone,
-        timestamp: serverTimestamp(),
-        status: "completed",
-        type: "loyalty_bonus_redeemed"
-      });
-
-      setView('success');
-      setTimeout(() => setUserStats({ visits: 0, nextIsFree: false }), 3000);
-
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="min-h-screen bg-[#050505] text-white font-sans overflow-x-hidden selection:bg-emerald-500/30">
-      <style>{`
-        .luxury-bg { background: radial-gradient(circle at 50% -20%, #064e3b 0%, #000 80%); }
+    <style>
+        body { background-color: #050505; color: white; font-family: 'Plus Jakarta Sans', sans-serif; overflow-x: hidden; -webkit-tap-highlight-color: transparent; }
+        .luxury-bg { background: radial-gradient(circle at 50% -20%, #064e3b 0%, #000 80%); min-height: 100vh; }
         .glass { background: rgba(255, 255, 255, 0.02); backdrop-filter: blur(25px); border: 1px solid rgba(255, 255, 255, 0.08); }
+        .font-outfit { font-family: 'Outfit', sans-serif; }
         @keyframes pulse-emerald { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.2); opacity: 0.5; } }
         .status-active { animation: pulse-emerald 2s infinite; box-shadow: 0 0 15px rgba(16, 185, 129, 0.4); }
         .stamp-box { transition: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1); }
         .stamp-checked { background: #10b981; border-color: #10b981; box-shadow: 0 0 15px rgba(16, 185, 129, 0.4); transform: scale(1.05); }
-      `}</style>
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        .toast-enter { animation: slideIn 0.3s ease-out forwards; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
 
-      <div className="luxury-bg min-h-screen flex flex-col items-center">
+    <script type="text/babel" data-type="module">
+        const { useState, useEffect, useRef } = React;
         
-        {safetyModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/85 backdrop-blur-md animate-in fade-in duration-300">
-            <div className="bg-[#0a0a0a] border border-emerald-500/30 rounded-[32px] p-8 max-w-sm w-full text-center shadow-2xl space-y-6 relative overflow-hidden">
-              <div className="absolute top-0 left-0 w-full h-1 bg-emerald-500"></div>
-              <div className="w-16 h-16 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto border border-emerald-500/20">
-                <CheckCircle className="w-8 h-8 text-emerald-500" />
-              </div>
-              <div className="space-y-2">
-                <h3 className="text-2xl font-black uppercase italic leading-tight">Ești la boxă?</h3>
-                <p className="text-sm text-white/60 font-medium leading-relaxed px-2">
-                  Apasă butonul pentru a primi cele <br/>
-                  <span className="text-emerald-400 font-bold">4 minute gratuite</span>.
-                </p>
-              </div>
-              <div className="grid grid-cols-1 gap-3 pt-2">
-                <button onClick={confirmAndStartWash} className="w-full py-5 bg-emerald-500 hover:bg-emerald-400 text-black font-black uppercase text-xs tracking-widest rounded-xl transition-all active:scale-95">
-                  DA, SUNT AICI
-                </button>
-                <button onClick={() => setSafetyModal(false)} className="w-full py-4 bg-white/5 hover:bg-white/10 text-white/40 font-bold uppercase text-xs tracking-widest rounded-xl transition-all">
-                  Anulează
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        // Importuri Firebase din CDN
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getFirestore, collection, addDoc, query, where, getDocs, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
-        <nav className="relative z-10 p-6 flex justify-between items-center max-w-md mx-auto w-full">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-emerald-500 rounded-2xl flex items-center justify-center shadow-lg">
-              <Zap className="text-black w-6 h-6 fill-current" />
-            </div>
-            <div className="flex flex-col">
-              <span className="font-black italic text-xl leading-none uppercase tracking-tighter">PWS <span className="text-emerald-500 text-2xl">Olt</span></span>
-              <span className="text-[7px] font-bold text-white/20 uppercase tracking-[0.4em] mt-1 italic leading-none">Elite Membership</span>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 px-3 py-1.5 glass rounded-full">
-            <div className={`w-1.5 h-1.5 rounded-full ${boxStatus === 'Online' ? 'bg-emerald-500 status-active' : 'bg-red-600'}`} />
-            <span className="text-[8px] font-black uppercase tracking-widest text-white/40 italic">{boxStatus}</span>
-          </div>
-        </nav>
+        // CONFIGURAȚIE BELGIA
+        const firebaseConfig = {
+            apiKey: "AIzaSyDlzoN9-l_Gvk3ZV2sERlRNQux5QdoSYi4",
+            authDomain: "premium-car-wash-systems.firebaseapp.com",
+            projectId: "premium-car-wash-systems",
+            storageBucket: "premium-car-wash-systems.appspot.com",
+            messagingSenderId: "1066804021666",
+            appId: "1:1066804021666:web:9494cf947ea14502758afb",
+            databaseURL: "https://premium-car-wash-systems-default-rtdb.europe-west1.firebasedatabase.app"
+        };
 
-        <main className="relative z-10 max-w-md mx-auto px-8 flex-1 flex flex-col justify-center w-full space-y-8 pb-12">
-          
-          {view === 'auth' && (
-            <div className="space-y-10 animate-in fade-in duration-500">
-              <div className="text-center">
-                <h2 className="text-6xl font-black italic tracking-tighter uppercase leading-[0.85]">SPALĂ <br /> <span className="text-emerald-500 text-7xl">GRATIS</span></h2>
-                <div className="mt-6 space-y-2">
-                  <p className="text-[14px] font-black text-white uppercase tracking-widest leading-none">A 5-A SPĂLARE ESTE GRATIS.</p>
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const rtdb = getDatabase(app);
+        const auth = getAuth(app);
+
+        const appId = 'premium_car_wash_systems'; 
+        const BOX_ID = "OLT_BOX_01";
+
+        const Icon = ({ name, className }) => {
+            useEffect(() => { if (window.lucide) window.lucide.createIcons(); }, [name]);
+            return <i data-lucide={name} className={className}></i>;
+        };
+
+        function App() {
+            const [view, setView] = useState('auth');
+            const [plate, setPlate] = useState('');
+            const [phone, setPhone] = useState('');
+            const [gdpr, setGdpr] = useState(false);
+            const [loading, setLoading] = useState(false);
+            const [boxStatus, setBoxStatus] = useState('Se conectează...');
+            const [userStats, setUserStats] = useState({ visits: 0, nextIsFree: false });
+            const [safetyModal, setSafetyModal] = useState(false);
+            const [currentUser, setCurrentUser] = useState(null);
+            
+            const isProcessing = useRef(false);
+
+            useEffect(() => {
+                const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+                    if (user) {
+                        setCurrentUser(user);
+                        const hbRef = ref(rtdb, `artifacts/${appId}/public/data/logs/${BOX_ID}/last_action`);
+                        onValue(hbRef, (snap) => {
+                            const val = snap.val();
+                            const ts = typeof val === 'object' ? (val['$numberLong'] ? Number(val['$numberLong']) : Date.now()) : Number(val);
+                            setBoxStatus(Math.abs(Date.now() - ts) < 60000 ? 'Online' : 'Offline');
+                        });
+                    } else {
+                        signInAnonymously(auth);
+                    }
+                });
+                return () => unsubscribeAuth();
+            }, []);
+
+            const refreshStats = async (cleanPlate) => {
+                const collectionPath = collection(db, 'artifacts', appId, 'public', 'data', 'comenzi_spalare');
+                const q = query(collectionPath, where("numarInmatriculare", "==", cleanPlate), where("status", "==", "completed"));
+                const snap = await getDocs(q);
+                const count = snap.size % 5; 
+                setUserStats({ visits: count, nextIsFree: count === 4 });
+            };
+
+            const handleLogin = async (e) => {
+                e.preventDefault();
+                if (!plate.trim() || !phone.trim() || !gdpr) return;
+                setLoading(true);
+                const cleanPlate = plate.toUpperCase().replace(/\s/g, '');
+                try {
+                    await refreshStats(cleanPlate);
+                    setView('dashboard');
+                } finally { setLoading(false); }
+            };
+
+            const confirmAndStartWash = async () => {
+                setSafetyModal(false);
+                setLoading(true);
+                try {
+                    const cleanPlate = plate.toUpperCase().replace(/\s/g, '');
+                    await set(ref(rtdb, `artifacts/${appId}/public/data/control/${BOX_ID}/inject_tokens`), 4);
+                    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'comenzi_spalare'), {
+                        numarInmatriculare: cleanPlate, telefon: phone, timestamp: serverTimestamp(), status: "completed", type: "loyalty_bonus"
+                    });
+                    setView('success');
+                    setTimeout(() => setUserStats({ visits: 0, nextIsFree: false }), 3000);
+                } finally { setLoading(false); }
+            };
+
+            return (
+                <div className="luxury-bg min-h-screen flex flex-col items-center">
+                    {safetyModal && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/85 backdrop-blur-md">
+                            <div className="bg-[#0a0a0a] border border-emerald-500/30 rounded-[32px] p-8 max-w-sm w-full text-center shadow-2xl space-y-6">
+                                <h3 className="text-2xl font-black font-outfit uppercase italic leading-tight">Ești la boxă?</h3>
+                                <p className="text-sm text-white/60 font-medium">Apasă pentru cele 4 minute gratuite.</p>
+                                <div className="grid grid-cols-1 gap-3 pt-2">
+                                    <button onClick={confirmAndStartWash} className="w-full py-5 bg-emerald-500 text-black font-black uppercase text-xs tracking-widest rounded-xl transition-all active:scale-95 shadow-[0_0_20px_rgba(16,185,129,0.2)]">DA, ACTIVEAZĂ</button>
+                                    <button onClick={() => setSafetyModal(false)} className="w-full py-4 bg-white/5 text-white/40 font-bold uppercase text-xs tracking-widest rounded-xl transition-all">Anulează</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    <nav className="p-6 flex justify-between items-center max-w-md w-full relative z-10">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-emerald-500 rounded-2xl flex items-center justify-center shadow-lg"><Icon name="zap" className="text-black w-6 h-6 fill-current" /></div>
+                            <div className="flex flex-col"><span className="font-black italic text-xl leading-none font-outfit uppercase tracking-tighter">PWS <span className="text-emerald-500 text-2xl">Olt</span></span><span className="text-[7px] font-bold text-white/20 uppercase tracking-[0.4em] mt-1 italic">Elite Membership</span></div>
+                        </div>
+                        <div className="flex items-center gap-2 px-3 py-1.5 glass rounded-full">
+                            <div className={`w-1.5 h-1.5 rounded-full ${boxStatus === 'Online' ? 'bg-emerald-500 status-active' : 'bg-red-600'}`} />
+                            <span className="text-[8px] font-black uppercase tracking-widest text-white/40 italic font-outfit">{boxStatus}</span>
+                        </div>
+                    </nav>
+
+                    <main className="max-w-md px-8 flex-1 flex flex-col justify-center w-full space-y-8 pb-12 relative z-10">
+                        {view === 'auth' && (
+                            <div className="space-y-10 animate-in fade-in">
+                                <div className="text-center space-y-4">
+                                    <h2 className="text-5xl font-black italic tracking-tighter uppercase leading-[0.85] font-outfit">A 5-A SPĂLARE <br /> <span className="text-emerald-500 text-7xl uppercase font-black italic">ESTE GRATIS</span></h2>
+                                    <div className="mx-auto w-12 h-0.5 bg-emerald-500/50"></div>
+                                    <p className="text-[10px] font-bold text-white/40 uppercase tracking-[0.3em] leading-none italic font-outfit">După 4 vizite înregistrate pe cardul digital</p>
+                                </div>
+                                <form onSubmit={handleLogin} className="space-y-4">
+                                    <input required placeholder="NR. ÎNMATRICULARE" className="w-full bg-white/5 border border-white/10 rounded-[28px] py-6 px-6 text-xl font-bold tracking-widest outline-none focus:border-emerald-500/50 uppercase placeholder:text-white/10 font-outfit" value={plate} onChange={e => setPlate(e.target.value)} />
+                                    <input required type="tel" placeholder="NUMĂR TELEFON" className="w-full bg-white/5 border border-white/10 rounded-[28px] py-6 px-6 text-xl font-bold outline-none focus:border-emerald-500/50 placeholder:text-white/10 font-outfit" value={phone} onChange={e => setPhone(e.target.value)} />
+                                    <div className="flex items-start gap-3 px-4 py-2 cursor-pointer" onClick={() => setGdpr(!gdpr)}>
+                                        <div className={`min-w-[1.25rem] h-5 rounded-md border flex items-center justify-center transition-all ${gdpr ? 'bg-emerald-500 border-emerald-500' : 'border-white/10'}`}>{gdpr && <Icon name="check" className="text-black w-4 h-4 stroke-[3]" />}</div>
+                                        <p className="text-[9px] text-white/40 font-medium leading-tight font-outfit">Accept procesarea datelor pentru programul de fidelitate.</p>
+                                    </div>
+                                    <button disabled={loading} className="w-full bg-white text-black py-7 rounded-[32px] font-black uppercase text-[11px] tracking-widest shadow-2xl active:scale-95 transition-all hover:bg-emerald-500 font-outfit">{loading ? "SE ACCESEAZĂ..." : "DESCHIDE CARDUL MEU"}</button>
+                                </form>
+                            </div>
+                        )}
+
+                        {view === 'dashboard' && (
+                            <div className="space-y-6 animate-in zoom-in-95">
+                                <div className="glass rounded-[48px] p-10 space-y-6 text-center shadow-2xl relative overflow-hidden">
+                                    <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 blur-3xl rounded-full" />
+                                    <h3 className="text-4xl font-black italic tracking-tighter uppercase font-outfit leading-none relative z-10">{plate.toUpperCase()}</h3>
+                                    <div className="flex justify-center gap-3 relative z-10">
+                                        {[...Array(5)].map((_, i) => (
+                                            <div key={i} className={`stamp-box w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center border-2 ${i < userStats.visits ? 'stamp-checked' : (i === 4 ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-white/10 bg-white/5')}`}>{i < userStats.visits ? <Icon name="check" className="text-black w-6 h-6 stroke-[4]" /> : (i === 4 ? <Icon name="gift" className={`w-5 h-5 ${userStats.nextIsFree ? 'text-emerald-400 animate-bounce' : 'text-emerald-500/20'}`} /> : <span className="text-white/10 font-black text-sm">{i + 1}</span>)}</div>
+                                        ))}
+                                    </div>
+                                    <div className="py-5 px-6 bg-white/5 rounded-3xl border border-white/5 mx-2 relative z-10">
+                                        {userStats.nextIsFree ? <p className="text-[13px] text-emerald-400 font-black uppercase italic leading-tight animate-pulse font-outfit">BONUS DISPONIBIL!</p> : <p className="text-[10px] text-white/50 uppercase tracking-widest italic font-outfit leading-tight">Introdu fisa în aparat. <br/>Vizita se bifează automat.</p>}
+                                    </div>
+                                    <div className="pt-2 border-t border-white/5 relative z-10">
+                                         {userStats.nextIsFree ? <button onClick={() => setSafetyModal(true)} className="w-full py-8 bg-emerald-500 text-black rounded-[32px] font-black uppercase text-[11px] tracking-[0.2em] shadow-[0_0_40px_rgba(16,185,129,0.3)] animate-pulse font-outfit">ACTIVEAZĂ 4 MINUTE GRATIS</button> : <div className="w-full py-6 bg-white/5 text-white/10 border border-white/5 rounded-[32px] font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 italic font-outfit"><span>Mai ai nevoie de {4 - userStats.visits} vizite</span></div>}
+                                    </div>
+                                </div>
+                                <button onClick={() => setView('auth')} className="w-full text-[9px] font-black text-white/20 uppercase tracking-[0.4em] flex items-center justify-center gap-2 hover:text-white transition-all font-outfit"><Icon name="refresh-cw" size={10} /> Schimbă Mașina</button>
+                            </div>
+                        )}
+
+                        {view === 'success' && (
+                            <div className="text-center space-y-10 animate-in fade-in zoom-in-90 duration-700">
+                               <div className="w-32 h-32 bg-emerald-500 rounded-[45px] flex items-center justify-center shadow-[0_0_50px_rgba(16,185,129,0.4)] mx-auto"><Icon name="zap" className="text-black w-14 h-14 fill-current" /></div>
+                               <h2 className="text-5xl font-black italic uppercase tracking-tighter leading-none font-outfit">BONUS ACTIVAT!</h2>
+                               <p className="text-emerald-400 text-[10px] uppercase font-bold tracking-[0.3em] animate-pulse italic font-outfit">Bucurați-vă de spălarea gratuită.</p>
+                               <button onClick={() => setView('auth')} className="bg-white/5 border border-white/10 px-10 py-5 rounded-full text-[10px] font-black uppercase italic tracking-widest active:scale-95 transition-all hover:bg-white/10 font-outfit">Înapoi</button>
+                            </div>
+                        )}
+                    </main>
+                    <footer className="py-8 text-center opacity-10 pointer-events-none mt-auto italic font-outfit"><p className="text-[7px] font-black uppercase tracking-[0.6em]">Premium Wash Systems • Balș Division</p></footer>
                 </div>
-              </div>
+            );
+        }
 
-              <form onSubmit={handleLogin} className="space-y-4">
-                <div className="relative group">
-                  <Car className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-white/10 group-focus-within:text-emerald-500/50 transition-colors" />
-                  <input required placeholder="NR. ÎNMATRICULARE" className="w-full bg-white/5 border border-white/10 rounded-[28px] py-6 pl-14 pr-6 text-xl font-bold tracking-widest outline-none focus:border-emerald-500/50 uppercase placeholder:text-white/10 transition-all" value={plate} onChange={e => setPlate(e.target.value)} />
-                </div>
-                <div className="relative group">
-                  <Phone className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-white/10 group-focus-within:text-emerald-500/50 transition-colors" />
-                  <input required type="tel" placeholder="07XX XXX XXX" className="w-full bg-white/5 border border-white/10 rounded-[28px] py-6 pl-14 pr-6 text-xl font-bold outline-none focus:border-emerald-500/50 placeholder:text-white/10 transition-all" value={phone} onChange={e => setPhone(e.target.value)} />
-                </div>
-                <div className="flex items-start gap-3 px-4 py-2 cursor-pointer" onClick={() => setGdpr(!gdpr)}>
-                  <div className={`min-w-[1.25rem] h-5 rounded-md border flex items-center justify-center mt-0.5 transition-all ${gdpr ? 'bg-emerald-500 border-emerald-500' : 'border-white/10'}`}>{gdpr && <Check className="text-black w-4 h-4 stroke-[3]" />}</div>
-                  <p className="text-[9px] text-white/40 font-medium leading-tight select-none">
-                    Accept procesarea datelor pentru bonusuri.
-                  </p>
-                </div>
-                <button disabled={loading || !currentUser} className="w-full bg-white text-black py-7 rounded-[32px] font-black uppercase text-[11px] tracking-widest shadow-2xl active:scale-95 transition-all hover:bg-emerald-500 disabled:opacity-50">
-                  {loading ? "SE VERIFICĂ..." : "DESCHIDE CARDUL MEU"}
-                </button>
-              </form>
-            </div>
-          )}
-
-          {view === 'dashboard' && (
-            <div className="space-y-6 animate-in zoom-in-95 duration-500">
-              <div className="glass rounded-[48px] p-10 space-y-6 relative overflow-hidden shadow-2xl text-center">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 blur-3xl rounded-full" />
-                <div className="relative z-10 text-center">
-                  <h3 className="text-4xl font-black italic tracking-tighter uppercase">{plate.toUpperCase()}</h3>
-                </div>
-                
-                <div className="relative z-10 flex justify-center gap-3 my-2">
-                  {[...Array(5)].map((_, i) => (
-                    <div key={i} className={`
-                      stamp-box w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center border-2 
-                      ${i < userStats.visits 
-                        ? 'stamp-checked' 
-                        : (i === 4 ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-white/10 bg-white/5')
-                      }
-                    `}>
-                      {i < userStats.visits ? (
-                        <Check className="text-black w-6 h-6 stroke-[4]" />
-                      ) : (
-                        i === 4 ? (
-                           <Gift className={`w-5 h-5 ${userStats.nextIsFree ? 'text-emerald-400 animate-bounce' : 'text-emerald-500/30'}`} />
-                        ) : (
-                          <span className="text-white/20 font-black text-sm">{i + 1}</span>
-                        )
-                      )}
-                    </div>
-                  ))}
-                </div>
-
-                <div className="py-5 px-6 bg-white/5 rounded-2xl border border-white/5 mx-2 relative z-10">
-                  {userStats.nextIsFree ? (
-                    <div className="space-y-3">
-                      <p className="text-[13px] text-white font-black leading-tight uppercase italic tracking-tighter">
-                        URMĂTOAREA SPĂLARE E GRATUITĂ!
-                      </p>
-                      <p className="text-[9px] text-white/50 leading-relaxed font-bold uppercase tracking-wide">
-                         Apasă butonul când ești în fața aparatului.
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="space-y-1">
-                      <div className="flex items-center justify-center gap-2 mb-2">
-                        <div className="w-2 h-2 bg-emerald-500 rounded-full animate-ping" />
-                        <span className="text-[9px] font-bold uppercase tracking-widest text-emerald-400">Senzor Activ</span>
-                      </div>
-                      <p className="text-[10px] text-white/60 font-medium leading-relaxed uppercase tracking-wide italic">
-                        Introdu fisa. Vizita se bifează automat.
-                      </p>
-                    </div>
-                  )}
-                </div>
-
-                <div className="pt-2 space-y-4 relative z-10 border-t border-white/5">
-                  <button onClick={adminAddStamp} disabled={userStats.nextIsFree || loading} className="w-full py-5 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center gap-3 active:scale-95 transition-all hover:bg-white/10 disabled:opacity-50">
-                    <Activity className="w-4 h-4 text-emerald-400" />
-                    <span className="text-[10px] font-black uppercase text-white/60 tracking-widest italic leading-none">Simulare Hardware (+1)</span>
-                  </button>
-
-                  {userStats.nextIsFree ? (
-                    <button 
-                      onClick={() => setSafetyModal(true)} 
-                      className="w-full py-8 bg-emerald-500 text-black rounded-[32px] font-black uppercase text-[11px] tracking-[0.2em] transition-all shadow-[0_0_30px_rgba(16,185,129,0.3)] animate-pulse"
-                    >
-                      ACTIVEAZĂ BONUSUL
-                    </button>
-                  ) : (
-                    <div className="w-full py-6 bg-white/5 text-white/10 border border-white/5 rounded-[32px] font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 italic">
-                      <Lock className="w-3 h-3" />
-                      <span>Ai nevoie de {4 - userStats.visits} vizite</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <button onClick={() => setView('auth')} className="w-full text-[10px] font-black text-white/20 uppercase tracking-[0.4em] flex items-center justify-center gap-2 hover:text-white transition-colors">
-                <RefreshCw size={12} /> Schimbă Mașina
-              </button>
-            </div>
-          )}
-
-          {view === 'success' && (
-            <div className="text-center space-y-10 animate-in fade-in zoom-in-90 duration-700">
-              <div className="relative mx-auto w-32 h-32 flex items-center justify-center">
-                <div className="absolute inset-0 bg-emerald-500/20 rounded-[45px] animate-ping" />
-                <div className="relative w-32 h-32 bg-emerald-500 rounded-[45px] flex items-center justify-center shadow-[0_0_50px_rgba(16,185,129,0.4)]">
-                  <Zap className="text-black w-14 h-14 fill-current" />
-                </div>
-              </div>
-              <div className="space-y-4">
-                <h2 className="text-5xl font-black italic uppercase tracking-tighter leading-none">BONUS ACTIVAT!</h2>
-                <p className="text-emerald-400 text-[10px] uppercase font-bold tracking-[0.2em] animate-pulse italic">Ați primit 4 minute gratuite.</p>
-              </div>
-              <button onClick={() => setView('auth')} className="bg-white/5 border border-white/10 px-10 py-5 rounded-full text-[10px] font-black uppercase italic tracking-widest active:scale-95 transition-all hover:bg-white/10">Înapoi</button>
-            </div>
-          )}
-        </main>
-
-        <footer className="py-8 text-center opacity-10 pointer-events-none mt-auto">
-          <p className="text-[7px] font-black uppercase tracking-[0.6em]">Premium Wash Systems • Olt Division</p>
-        </footer>
-      </div>
-    </div>
-  );
-}
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
