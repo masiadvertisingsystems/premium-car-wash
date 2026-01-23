@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>PWS Elite | Balș Control</title>
     
-    <!-- INFRASTRUCTURĂ: Tailwind CSS, React, Firebase & Lucide -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -36,7 +35,7 @@
         import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
-        // CONFIG (BELGIA - europe-west1)
+        // CONFIG (FIXAT PE BELGIA - europe-west1)
         const firebaseConfig = {
             apiKey: "AIzaSyDlzoN9-l_Gvk3ZV2sERlRNQux5QdoSYi4",
             authDomain: "premium-car-wash-systems.firebaseapp.com",
@@ -60,12 +59,11 @@
             return <i data-lucide={name} className={className}></i>;
         };
 
-        const Toast = ({ message, type = 'success', onClose }) => {
+        const Toast = ({ message, onClose }) => {
             useEffect(() => { const timer = setTimeout(onClose, 3000); return () => clearTimeout(timer); }, [onClose]);
-            const isError = type === 'error';
             return (
-                <div className={`fixed top-4 right-4 z-[100] flex items-center gap-3 px-4 py-3 rounded-xl border backdrop-blur-md shadow-2xl toast-enter ${isError ? 'border-red-500/50 bg-red-500/10 text-red-200' : 'border-emerald-500/50 bg-emerald-500/10 text-emerald-200'}`}>
-                    <Icon name={isError ? "alert-triangle" : "check-circle"} className="w-5 h-5 shrink-0" />
+                <div className="fixed top-4 right-4 z-[100] flex items-center gap-3 px-4 py-3 rounded-xl border border-emerald-500/50 bg-emerald-500/10 backdrop-blur-md shadow-2xl toast-enter text-emerald-200">
+                    <Icon name="check-circle" className="w-5 h-5 shrink-0" />
                     <p className="text-xs font-bold uppercase tracking-wide">{message}</p>
                 </div>
             );
@@ -95,19 +93,18 @@
                             setBoxStatus(isOnline ? 'Online' : 'Offline');
                         });
                     } else {
-                        signInAnonymously(auth).catch(err => {
-                            setToast({ message: "Eroare Securitate Firebase!", type: 'error' });
-                        });
+                        signInAnonymously(auth);
                     }
                 });
                 return () => unsubscribeAuth();
             }, []);
 
+            // MONITORIZARE JETONIER (Sincronizat cu Shelly v1.6)
             useEffect(() => {
                 if (view !== 'dashboard' || !currentUser) return;
                 const tokensRef = ref(rtdb, `artifacts/${appId}/public/data/telemetry/${BOX_ID}/pending_tokens`);
                 
-                const unsubscribeTokens = onValue(tokensRef, async (snapshot) => {
+                onValue(tokensRef, async (snapshot) => {
                     const tokens = snapshot.val();
                     if (tokens > 0 && !isProcessing.current) {
                         isProcessing.current = true;
@@ -115,8 +112,7 @@
                             const cleanPlate = plate.toUpperCase().replace(/\s/g, '');
                             const collectionPath = collection(db, 'artifacts', appId, 'public', 'data', 'comenzi_spalare');
                             const currentSnap = await getDocs(query(collectionPath, where("nr_inmatriculare", "==", cleanPlate), where("status", "==", "completed")));
-                            const currentVisits = currentSnap.size % 5;
-                            const nextStamps = (currentVisits + 1) > 5 ? 1 : (currentVisits + 1);
+                            const nextStamps = (currentSnap.size % 5 + 1) > 5 ? 1 : (currentSnap.size % 5 + 1);
 
                             await addDoc(collectionPath, {
                                 "last_visit": new Date().toISOString(),
@@ -127,26 +123,21 @@
                                 "user agent": navigator.userAgent,
                                 "status": "completed",
                                 "type": "physical_wash",
-                                "uid": currentUser.uid // Adăugat pentru reguli de securitate
+                                "uid": currentUser.uid
                             });
 
                             await set(tokensRef, 0); 
                             await refreshStats(cleanPlate);
-                            setToast({ message: "Vizită înregistrată!", type: 'success' });
-                        } catch (err) { 
-                            setToast({ message: "Eroare: Acces Refuzat!", type: 'error' });
-                        } finally { isProcessing.current = false; }
+                            setToast({ message: "Vizită înregistrată!" });
+                        } catch (err) { console.error(err); } 
+                        finally { isProcessing.current = false; }
                     }
                 });
-                return () => unsubscribeTokens();
-            }, [view, currentUser, plate, phone, userStats.visits]);
+            }, [view, currentUser, plate, phone]);
 
             const simulateCoinRemote = async () => {
                 if (!currentUser || view !== 'dashboard' || isProcessing.current) return;
-                try {
-                    const tokensRef = ref(rtdb, `artifacts/${appId}/public/data/telemetry/${BOX_ID}/pending_tokens`);
-                    await set(tokensRef, 1); 
-                } catch (err) { setToast({ message: "Simulare eșuată!", type: 'error' }); }
+                await set(ref(rtdb, `artifacts/${appId}/public/data/telemetry/${BOX_ID}/pending_tokens`), 1); 
             };
 
             const refreshStats = async (cleanPlate) => {
@@ -165,9 +156,8 @@
                 try {
                     await refreshStats(cleanPlate);
                     setView('dashboard');
-                } catch (err) { 
-                    setToast({ message: "Eroare Bază de Date!", type: 'error' });
-                } finally { setLoading(false); }
+                } catch (err) { console.error(err); } 
+                finally { setLoading(false); }
             };
 
             const confirmAndStartWash = async () => {
@@ -175,10 +165,10 @@
                 setLoading(true);
                 try {
                     const cleanPlate = plate.toUpperCase().replace(/\s/g, '');
+                    // Comanda către Shelly
                     await set(ref(rtdb, `artifacts/${appId}/public/data/control/${BOX_ID}/inject_tokens`), 4);
                     
-                    const collectionPath = collection(db, 'artifacts', appId, 'public', 'data', 'comenzi_spalare');
-                    await addDoc(collectionPath, {
+                    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'comenzi_spalare'), {
                         "last_visit": new Date().toISOString(),
                         "nr_inmatriculare": cleanPlate,
                         "jetoane detectate": 0,
@@ -191,29 +181,25 @@
                     });
                     setView('success');
                     setTimeout(() => setUserStats({ visits: 0, nextIsFree: false }), 3000);
-                } catch (err) { 
-                    setToast({ message: "Eroare Activare Bonus!", type: 'error' });
-                } finally { setLoading(false); }
+                } catch (err) { console.error(err); } 
+                finally { setLoading(false); }
             };
 
             return (
                 <div className="luxury-bg min-h-screen flex flex-col items-center relative selection:bg-emerald-500/30">
-                    {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+                    {toast && <Toast message={toast.message} onClose={() => setToast(null)} />}
                     
                     {view === 'dashboard' && (
-                        <button 
-                            onClick={simulateCoinRemote}
-                            className="fixed bottom-6 right-6 z-[99] glass p-4 rounded-2xl border border-white/20 hover:bg-emerald-500/20 active:scale-90 transition-all flex items-center gap-2 group"
-                        >
-                            <Icon name="database" className="w-4 h-4 text-emerald-500 group-hover:animate-pulse" />
-                            <span className="text-[10px] font-black uppercase tracking-widest text-white/40">SIMULARE JETON</span>
+                        <button onClick={simulateCoinRemote} className="fixed bottom-6 right-6 z-[99] glass p-4 rounded-2xl border border-white/20 hover:bg-emerald-500/20 active:scale-90 transition-all flex items-center gap-2 group">
+                            <Icon name="database" className="w-4 h-4 text-emerald-500" />
+                            <span className="text-[10px] font-black uppercase tracking-widest text-white/40">SIMULARE</span>
                         </button>
                     )}
 
                     {safetyModal && (
                         <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/85 backdrop-blur-md animate-in fade-in duration-300">
                             <div className="bg-[#0a0a0a] border border-emerald-500/30 rounded-[32px] p-8 max-w-sm w-full text-center shadow-2xl space-y-6">
-                                <h3 className="text-2xl font-black font-outfit uppercase italic leading-tight">Activezi Bonusul?</h3>
+                                <h3 className="text-2xl font-black font-outfit uppercase italic leading-tight">Porniți spălarea?</h3>
                                 <p className="text-sm text-white/60 font-medium leading-relaxed">Vei primi 4 minute gratuite la boxă pentru vizita nr. 5.</p>
                                 <div className="grid grid-cols-1 gap-3 pt-2">
                                     <button onClick={confirmAndStartWash} className="w-full py-5 bg-emerald-500 text-black font-black uppercase text-xs tracking-widest rounded-xl transition-all active:scale-95 shadow-[0_0_20px_rgba(16,185,129,0.2)]">DA, ACTIVEAZĂ</button>
@@ -226,7 +212,7 @@
                     <nav className="relative z-10 p-6 flex justify-between items-center max-w-md mx-auto w-full">
                         <div className="flex items-center gap-3">
                             <div className="w-10 h-10 bg-emerald-500 rounded-2xl flex items-center justify-center shadow-lg"><Icon name="zap" className="text-black w-6 h-6 fill-current" /></div>
-                            <div className="flex flex-col"><span className="font-black italic text-xl leading-none font-outfit uppercase tracking-tighter leading-none">PWS <span className="text-emerald-500">Olt</span></span><span className="text-[7px] font-bold text-white/20 uppercase tracking-[0.4em] mt-1 italic leading-none text-left">Elite Membership</span></div>
+                            <div className="flex flex-col"><span className="font-black italic text-xl leading-none font-outfit uppercase tracking-tighter leading-none">PWS <span className="text-emerald-500 text-2xl">Olt</span></span><span className="text-[7px] font-bold text-white/20 uppercase tracking-[0.4em] mt-1 italic leading-none">Elite Membership</span></div>
                         </div>
                         <div className="flex items-center gap-2 px-3 py-1.5 glass rounded-full">
                             <div className={`w-1.5 h-1.5 rounded-full ${boxStatus === 'Online' ? 'bg-emerald-500 status-active' : 'bg-red-600'}`} />
@@ -237,24 +223,15 @@
                     <main className="relative z-10 max-w-md mx-auto px-8 flex-1 flex flex-col justify-center w-full space-y-8 pb-12">
                         {view === 'auth' && (
                             <div className="space-y-10 animate-in fade-in">
-                                <div className="text-center">
-                                    <h2 className="text-6xl font-black italic tracking-tighter uppercase leading-[0.85] font-outfit">SPALĂ <br /> <span className="text-emerald-500 text-7xl font-black italic">GRATIS</span></h2>
-                                    <div className="mt-6 space-y-2"><p className="text-[14px] font-black text-white uppercase tracking-widest leading-none">A 5-A SPĂLARE ESTE GRATIS.</p></div>
-                                </div>
+                                <h2 className="text-6xl font-black italic tracking-tighter uppercase leading-[0.85] font-outfit text-center">SPALĂ <br /> <span className="text-emerald-500 text-7xl font-black italic">GRATIS</span></h2>
                                 <form onSubmit={handleLogin} className="space-y-4">
-                                    <div className="relative group">
-                                        <Icon name="car" className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-white/10 transition-colors group-focus-within:text-emerald-500" />
-                                        <input required placeholder="NR. ÎNMATRICULARE" className="w-full bg-white/5 border border-white/10 rounded-[28px] py-6 pl-14 pr-6 text-xl font-bold tracking-widest outline-none focus:border-emerald-500/50 uppercase placeholder:text-white/10 transition-all" value={plate} onChange={e => setPlate(e.target.value)} />
-                                    </div>
-                                    <div className="relative group">
-                                        <Icon name="phone" className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-white/10 transition-colors group-focus-within:text-emerald-500" />
-                                        <input required type="tel" placeholder="07XX XXX XXX" className="w-full bg-white/5 border border-white/10 rounded-[28px] py-6 pl-14 pr-6 text-xl font-bold outline-none focus:border-emerald-500/50 placeholder:text-white/10 transition-all" value={phone} onChange={e => setPhone(e.target.value)} />
-                                    </div>
+                                    <input required placeholder="NR. ÎNMATRICULARE" className="w-full bg-white/5 border border-white/10 rounded-[28px] py-6 px-6 text-xl font-bold tracking-widest outline-none focus:border-emerald-500/50 uppercase placeholder:text-white/10" value={plate} onChange={e => setPlate(e.target.value)} />
+                                    <input required type="tel" placeholder="07XX XXX XXX" className="w-full bg-white/5 border border-white/10 rounded-[28px] py-6 px-6 text-xl font-bold outline-none focus:border-emerald-500/50 placeholder:text-white/10 transition-all" value={phone} onChange={e => setPhone(e.target.value)} />
                                     <div className="flex items-start gap-3 px-4 py-2 cursor-pointer" onClick={() => setGdpr(!gdpr)}>
-                                        <div className={`min-w-[1.25rem] h-5 rounded-md border flex items-center justify-center mt-0.5 transition-all ${gdpr ? 'bg-emerald-500 border-emerald-500' : 'border-white/10'}`}>{gdpr && <Icon name="check" className="text-black w-4 h-4" />}</div>
-                                        <p className="text-[9px] text-white/40 font-medium leading-tight text-left"><span className="font-bold text-emerald-400 uppercase tracking-tighter">GDPR:</span> Sunt de acord cu prelucrarea datelor.</p>
+                                        <div className={`min-w-[1.25rem] h-5 rounded-md border flex items-center justify-center transition-all ${gdpr ? 'bg-emerald-500 border-emerald-500' : 'border-white/10'}`}>{gdpr && <Icon name="check" className="text-black w-4 h-4 stroke-[3]" />}</div>
+                                        <p className="text-[9px] text-white/40 font-medium leading-tight">Accept procesarea datelor pentru bonusuri.</p>
                                     </div>
-                                    <button disabled={loading} className="w-full bg-white text-black py-7 rounded-[32px] font-black uppercase text-[11px] tracking-widest shadow-2xl active:scale-95 transition-all hover:bg-emerald-500 disabled:opacity-50">{loading ? "SE VERIFICĂ..." : "DESCHIDE CARDUL MEU"}</button>
+                                    <button disabled={loading} className="w-full bg-white text-black py-7 rounded-[32px] font-black uppercase text-[11px] tracking-widest shadow-2xl hover:bg-emerald-500 transition-all">{loading ? "SE VERIFICĂ..." : "DESCHIDE CARDUL MEU"}</button>
                                 </form>
                             </div>
                         )}
@@ -262,49 +239,30 @@
                         {view === 'dashboard' && (
                             <div className="space-y-6 animate-in zoom-in-95 duration-500">
                                 <div className="glass rounded-[48px] p-10 space-y-6 relative overflow-hidden shadow-2xl text-center">
-                                    <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 blur-3xl rounded-full" />
-                                    <div className="relative z-10"><p className="text-[10px] font-black text-emerald-500 uppercase italic tracking-widest leading-none">Membru Elite</p><h3 className="text-4xl font-black italic tracking-tighter uppercase font-outfit leading-none mt-2">{plate.toUpperCase()}</h3></div>
+                                    <h3 className="text-4xl font-black italic tracking-tighter uppercase font-outfit">{plate.toUpperCase()}</h3>
                                     <div className="relative z-10 flex justify-center gap-3 my-2">
                                         {[...Array(5)].map((_, i) => (
                                             <div key={i} className={`stamp-box w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center border-2 ${i < userStats.visits ? 'stamp-checked' : (i === 4 ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-white/10 bg-white/5')}`}>
-                                                {i < userStats.visits ? (<Icon name="check" className="text-black w-6 h-6 stroke-[3]" />) : (i === 4 ? (<Icon name="gift" className={`w-5 h-5 ${userStats.nextIsFree ? 'text-emerald-400 animate-bounce' : 'text-emerald-500/30'}`} />) : (<span className="text-white/20 font-black text-sm">{i + 1}</span>))}
+                                                {i < userStats.visits ? <Icon name="check" className="text-black w-6 h-6 stroke-[3]" /> : (i === 4 ? <Icon name="gift" className={`w-5 h-5 ${userStats.nextIsFree ? 'text-emerald-400 animate-bounce' : 'text-emerald-500/30'}`} /> : <span className="text-white/20 font-black text-sm">{i + 1}</span>)}
                                             </div>
                                         ))}
                                     </div>
-                                    <div className="py-5 px-6 bg-white/5 rounded-2xl border border-white/5 mx-2 relative z-10 transition-all duration-500">
-                                        {userStats.nextIsFree ? (
-                                            <p className="text-[13px] text-white font-black uppercase italic leading-tight">SPĂLAREA GRATUITĂ ESTE DISPONIBILĂ!</p>
-                                        ) : (
-                                            <div className="space-y-1">
-                                                <div className="flex items-center justify-center gap-2 mb-2 transition-all"><div className="w-2 h-2 bg-emerald-500 rounded-full animate-ping" /><span className="text-[9px] font-bold uppercase tracking-widest text-emerald-400">Scanare Activă</span></div>
-                                                <p className="text-[10px] text-white/60 font-medium leading-relaxed uppercase tracking-wide italic">Baga fisa în aparat. <br/>Vizita se bifează automat.</p>
-                                            </div>
-                                        )}
+                                    <div className="py-5 px-6 bg-white/5 rounded-2xl border border-white/5">
+                                        {userStats.nextIsFree ? <p className="text-[13px] text-white font-black uppercase italic leading-tight">SPĂLAREA GRATUITĂ DISPONIBILĂ!</p> : <p className="text-[10px] text-white/60 font-medium leading-relaxed uppercase tracking-wide italic">Baga fisa în aparat. Vizita se bifează automat.</p>}
                                     </div>
                                     <div className="pt-2 relative z-10 border-t border-white/5">
-                                         {userStats.nextIsFree ? (
-                                              <button onClick={() => setSafetyModal(true)} className="w-full py-8 bg-emerald-500 text-black rounded-[32px] font-black uppercase text-[11px] tracking-[0.2em] transition-all shadow-[0_0_30px_rgba(16,185,129,0.3)] animate-pulse active:scale-95">ACTIVEAZĂ BONUSUL (4 MIN)</button>
-                                         ) : (
-                                              <div className="w-full py-6 bg-white/5 text-white/10 border border-white/5 rounded-[32px] font-black uppercase text-[10px] tracking-widest cursor-not-allowed flex items-center justify-center gap-2 italic leading-none"><Icon name="lock" className="w-3 h-3" /><span>Mai ai nevoie de {4 - userStats.visits} vizite</span></div>
-                                         )}
+                                         {userStats.nextIsFree ? <button onClick={() => setSafetyModal(true)} className="w-full py-8 bg-emerald-500 text-black rounded-[32px] font-black uppercase text-[11px] tracking-[0.2em] shadow-[0_0_30px_rgba(16,185,129,0.3)] animate-pulse active:scale-95 transition-all">ACTIVEAZĂ BONUSUL</button> : <div className="w-full py-6 bg-white/5 text-white/10 border border-white/5 rounded-[32px] font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 italic leading-none"><Icon name="lock" className="w-3 h-3" /><span>Ai {userStats.visits}/4 vizite</span></div>}
                                     </div>
                                 </div>
-                                <button onClick={() => setView('auth')} className="w-full text-[10px] font-black text-white/20 uppercase tracking-[0.4em] flex items-center justify-center gap-2 hover:text-white transition-colors duration-300">
-                                    <Icon name="refresh-cw" className="w-3 h-3" /> Schimbă Mașina
-                                </button>
+                                <button onClick={() => setView('auth')} className="w-full text-[10px] font-black text-white/20 uppercase tracking-[0.4em] flex items-center justify-center gap-2 hover:text-white transition-colors duration-300"><Icon name="refresh-cw" size={12} /> Schimbă Mașina</button>
                             </div>
                         )}
 
                         {view === 'success' && (
                             <div className="text-center space-y-10 animate-in fade-in zoom-in-90 duration-700">
-                               <div className="relative mx-auto w-32 h-32 flex items-center justify-center">
-                                  <div className="absolute inset-0 bg-emerald-500/20 rounded-[45px] animate-ping" />
-                                  <div className="relative w-32 h-32 bg-emerald-500 rounded-[45px] flex items-center justify-center shadow-[0_0_50px_rgba(16,185,129,0.4)]"><Icon name="zap" className="text-black w-14 h-14 fill-current" /></div>
-                               </div>
-                               <div className="space-y-4">
-                                  <h2 className="text-5xl font-black italic uppercase tracking-tighter leading-none font-outfit">BONUS ACTIVAT!</h2>
-                                  <p className="text-emerald-400 text-[10px] uppercase font-bold tracking-[0.2em] animate-pulse italic">Ați primit 4 minute timp liber.</p>
-                                </div>
+                               <div className="w-32 h-32 bg-emerald-500 rounded-[45px] flex items-center justify-center shadow-[0_0_50px_rgba(16,185,129,0.4)] mx-auto"><Icon name="zap" className="text-black w-14 h-14 fill-current" /></div>
+                               <h2 className="text-5xl font-black italic uppercase tracking-tighter leading-none font-outfit">BONUS ACTIVAT!</h2>
+                               <p className="text-emerald-400 text-[10px] uppercase font-bold tracking-[0.2em] animate-pulse italic">Ați primit 4 minute gratuite.</p>
                                <button onClick={() => setView('auth')} className="bg-white/5 border border-white/10 px-10 py-5 rounded-full text-[10px] font-black uppercase italic tracking-widest active:scale-95 transition-all hover:bg-white/10">Înapoi</button>
                             </div>
                         )}
