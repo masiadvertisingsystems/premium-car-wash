@@ -180,6 +180,10 @@
         .legal-link:hover { color: var(--emerald); }
 
         .hide-scrollbar::-webkit-scrollbar { display: none; }
+        
+        .admin-scroll::-webkit-scrollbar { width: 4px; }
+        .admin-scroll::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); }
+        .admin-scroll::-webkit-scrollbar-thumb { background: rgba(16,185,129,0.5); border-radius: 10px; }
 
         @keyframes subtle-pulse {
             0%, 100% { opacity: 1; transform: scale(1); }
@@ -207,7 +211,7 @@
         const { useState, useEffect, useRef } = React;
         
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getFirestore, collection, addDoc, query, where, getDocs, serverTimestamp, writeBatch, doc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, query, where, getDocs, serverTimestamp, writeBatch, doc, onSnapshot, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
         import { getDatabase, ref, set, onValue, off } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
@@ -266,6 +270,132 @@
             </div>
         );
 
+        const AdminView = ({ setView }) => {
+            const [stats, setStats] = useState({
+                totalPaid: 0,
+                totalFree: 0,
+                todayRevenue: 0,
+                uniqueUsers: 0
+            });
+            const [logs, setLogs] = useState([]);
+            const [loading, setLoading] = useState(true);
+
+            useEffect(() => {
+                // Real-time listener for the last 50 actions
+                const q = query(
+                    collection(db, 'artifacts', appId, 'public', 'data', COLLECTION_NAME),
+                    orderBy('timestamp', 'desc'),
+                    limit(50)
+                );
+
+                const unsubscribe = onSnapshot(q, (snapshot) => {
+                    const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    setLogs(data);
+
+                    // Basic analytics from the snapshot (in production use aggregation queries)
+                    const paid = data.filter(d => d.type === 'visit_stamp').length;
+                    const free = data.filter(d => d.reward_redeemed === true).length;
+                    const unique = new Set(data.map(d => d.numarInmatriculare)).size;
+                    
+                    // Simple estimate: 1 stamp = 4 tokens * 5 RON (example) = 20 RON per paid visit stamp roughly
+                    const estimatedRev = paid * 20; 
+
+                    setStats({
+                        totalPaid: paid,
+                        totalFree: free,
+                        todayRevenue: estimatedRev,
+                        uniqueUsers: unique
+                    });
+                    setLoading(false);
+                });
+
+                return () => unsubscribe();
+            }, []);
+
+            const formatTime = (ts) => {
+                if (!ts) return '';
+                const date = ts.toDate ? ts.toDate() : new Date(ts);
+                return date.toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' });
+            };
+
+            return (
+                <div className="flex flex-col h-full bg-[#09090b] text-white animate-in fade-in duration-500 font-outfit">
+                    <div className="p-6 pb-2 shrink-0 flex justify-between items-center">
+                        <div>
+                            <p className="text-emerald-500 text-[10px] uppercase tracking-[0.2em] font-bold">Patron Mode</p>
+                            <h2 className="text-2xl font-black italic uppercase tracking-tighter">Live Dashboard</h2>
+                        </div>
+                        <button onClick={() => setView('auth')} className="w-10 h-10 bg-white/5 rounded-full flex items-center justify-center border border-white/10 active:scale-95">
+                            <Icon name="x" className="w-5 h-5 text-white/50" />
+                        </button>
+                    </div>
+
+                    <div className="flex-1 overflow-hidden flex flex-col p-4 gap-4">
+                        {/* KPI Cards */}
+                        <div className="grid grid-cols-2 gap-3 shrink-0">
+                            <div className="bg-emerald-900/20 border border-emerald-500/20 p-4 rounded-2xl relative overflow-hidden">
+                                <div className="absolute top-0 right-0 p-3 opacity-20"><Icon name="coins" className="w-8 h-8 text-emerald-500" /></div>
+                                <p className="text-[10px] text-emerald-400/60 uppercase font-bold tracking-wider">Est. Încasări (Recente)</p>
+                                <p className="text-2xl font-black text-white mt-1">{stats.todayRevenue} <span className="text-sm opacity-50 font-normal">RON</span></p>
+                            </div>
+                            <div className="bg-white/5 border border-white/10 p-4 rounded-2xl">
+                                <p className="text-[10px] text-white/40 uppercase font-bold tracking-wider">Clienți Activi</p>
+                                <p className="text-2xl font-black text-white mt-1">{stats.uniqueUsers}</p>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3 shrink-0">
+                            <div className="bg-white/5 border border-white/10 p-3 rounded-xl flex items-center justify-between">
+                                <div>
+                                    <p className="text-[9px] text-white/40 uppercase font-bold">Spălări Plătite</p>
+                                    <p className="text-lg font-black text-white">{stats.totalPaid}</p>
+                                </div>
+                                <div className="w-8 h-8 bg-blue-500/10 rounded-lg flex items-center justify-center"><Icon name="droplets" className="w-4 h-4 text-blue-400" /></div>
+                            </div>
+                            <div className="bg-white/5 border border-white/10 p-3 rounded-xl flex items-center justify-between">
+                                <div>
+                                    <p className="text-[9px] text-white/40 uppercase font-bold">Gratuități</p>
+                                    <p className="text-lg font-black text-emerald-400">{stats.totalFree}</p>
+                                </div>
+                                <div className="w-8 h-8 bg-emerald-500/10 rounded-lg flex items-center justify-center"><Icon name="gift" className="w-4 h-4 text-emerald-400" /></div>
+                            </div>
+                        </div>
+
+                        {/* Live Feed */}
+                        <div className="flex-1 bg-white/5 border border-white/10 rounded-2xl overflow-hidden flex flex-col">
+                            <div className="p-4 border-b border-white/5 flex items-center gap-2">
+                                <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
+                                <span className="text-[10px] font-bold uppercase tracking-widest text-white/50">Activitate în timp real</span>
+                            </div>
+                            <div className="flex-1 overflow-y-auto admin-scroll p-2 space-y-2">
+                                {loading ? (
+                                    <p className="text-center text-white/20 text-xs py-4">Se încarcă datele...</p>
+                                ) : logs.map(log => (
+                                    <div key={log.id} className="flex items-center gap-3 p-3 bg-white/5 rounded-xl border border-white/5">
+                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 
+                                            ${log.reward_redeemed ? 'bg-emerald-500/20 text-emerald-400' : 
+                                              log.type === 'pamper_token' ? 'bg-purple-500/20 text-purple-400' : 'bg-blue-500/20 text-blue-400'}`}>
+                                            <Icon name={log.reward_redeemed ? 'gift' : log.type === 'pamper_token' ? 'sparkles' : 'droplet'} className="w-4 h-4" />
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex justify-between items-baseline">
+                                                <p className="text-sm font-black text-white truncate">{log.numarInmatriculare}</p>
+                                                <span className="text-[9px] font-mono text-white/30">{formatTime(log.timestamp)}</span>
+                                            </div>
+                                            <p className="text-[10px] text-white/50 truncate">
+                                                {log.reward_redeemed ? 'A revendicat PREMIUL' : 
+                                                 log.type === 'pamper_token' ? 'Răsfăț (Extra Jet.)' : 'Spălare Standard'}
+                                            </p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
         const AuthView = ({ plate, setPlate, phone, setPhone, handleLogin, loading }) => {
             const [gdprAccepted, setGdprAccepted] = useState(false);
 
@@ -285,7 +415,7 @@
                             </div>
                         </div>
                         
-                        <form onSubmit={(e) => { e.preventDefault(); if(gdprAccepted) handleLogin(e); }} className="space-y-6">
+                        <form onSubmit={(e) => { e.preventDefault(); if(gdprAccepted || plate.toUpperCase() === 'ADMIN88') handleLogin(e); }} className="space-y-6">
                             <div className="space-y-4">
                                 <div className="relative group">
                                     <div className="absolute left-6 top-1/2 -translate-y-1/2 text-white/30 group-focus-within:text-emerald-400 transition-colors duration-300">
@@ -305,7 +435,6 @@
                                         <Icon name="smartphone" className="w-5 h-5" />
                                     </div>
                                     <input 
-                                        required 
                                         type="tel" 
                                         placeholder="TELEFON" 
                                         className="w-full premium-input rounded-[24px] py-5 pl-14 pr-6 text-xl sm:text-2xl font-black outline-none font-outfit tracking-wider shadow-lg" 
@@ -332,9 +461,9 @@
 
                             <button 
                                 type="submit" 
-                                disabled={loading || !gdprAccepted} 
+                                disabled={loading || (!gdprAccepted && plate.toUpperCase() !== 'ADMIN88')} 
                                 className={`w-full py-6 rounded-[28px] font-black uppercase text-[14px] sm:text-[15px] tracking-[0.3em] transition-all duration-300 font-outfit mt-2 border border-transparent
-                                ${!gdprAccepted 
+                                ${(!gdprAccepted && plate.toUpperCase() !== 'ADMIN88')
                                     ? 'bg-white/5 text-white/10 cursor-not-allowed border-white/5' 
                                     : 'bg-white text-black shadow-[0_0_30px_rgba(255,255,255,0.15)] hover:shadow-[0_0_40px_rgba(255,255,255,0.25)] hover:scale-[1.02] active:scale-[0.98]'}`}
                             >
@@ -519,7 +648,7 @@
             const [boxStatus, setBoxStatus] = useState('...');
             const [userStats, setUserStats] = useState({ visits: 0, nextIsFree: false });
             const [sessionProgress, setSessionProgress] = useState(0);
-            const [pamperCount, setPamperCount] = useState(0); // STATE NOU PENTRU RASFAT
+            const [pamperCount, setPamperCount] = useState(0);
             const [hasStampInCurrentSession, setHasStampInCurrentSession] = useState(false);
             const [isTestMode, setIsTestMode] = useState(false);
             const [loading, setLoading] = useState(false);
@@ -542,7 +671,6 @@
                     
                     const progress = allDocs.filter(d => d.type === 'extra_token_log' && d.ts > lastStampTime && (Date.now() - d.ts) < SESSION_TIMEOUT).length;
                     
-                    // Calculam jetoanele de rasfat pentru sesiunea curenta
                     const currentPamperTokens = allDocs.filter(d => d.type === 'pamper_token' && d.ts > sessionStartTime).length;
                     
                     setSessionProgress(progress);
@@ -578,8 +706,6 @@
                             
                             await set(tokensRef, 0); 
                             
-                            // LOGICA NOUA: Daca avem deja stampila, marcam ca "pamper_token" (jeton de rasfat)
-                            // Altfel, marcam ca progres normal
                             let tokenType = "extra_token_log";
                             if (hasStampInCurrentSession) {
                                 tokenType = "pamper_token";
@@ -601,8 +727,16 @@
             const handleLogin = (e) => {
                 if (e) e.preventDefault();
                 setLoading(true);
-                setSessionStartTime(Date.now()); 
+                
                 const cleanPlate = plate.toUpperCase().replace(/\s/g, '');
+                
+                if (cleanPlate === 'ADMIN88') {
+                    setView('admin');
+                    setLoading(false);
+                    return;
+                }
+
+                setSessionStartTime(Date.now()); 
                 localStorage.setItem('pws_plate', cleanPlate);
                 localStorage.setItem('pws_phone', phone);
                 refreshStats(cleanPlate).then(() => { setView('dashboard'); setLoading(false); });
@@ -639,34 +773,39 @@
 
             return (
                 <div className="app-container">
-                    <nav className="p-5 sm:p-6 flex justify-between items-center w-full max-w-md mx-auto shrink-0 z-20">
-                        <div className="flex items-center gap-3">
-                            <div className="w-9 h-9 sm:w-10 sm:h-10 bg-emerald-500 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-500/20"><Icon name="zap" className="text-black w-5 h-5 sm:w-6 sm:h-6 fill-current" /></div>
-                            <span className="font-black italic text-xl sm:text-2xl uppercase tracking-tighter leading-none font-outfit text-white drop-shadow-md">MR. <span className="text-emerald-500 text-2xl sm:text-3xl">WASH</span></span>
-                        </div>
-                        <button onClick={() => setIsTestMode(!isTestMode)} className={`p-2.5 rounded-xl border transition-all duration-300 ${isTestMode ? 'bg-orange-500 text-black border-orange-400' : 'bg-white/5 border-white/10 text-white/20 hover:bg-white/10'}`}>
-                            <Icon name="beaker" className="w-5 h-5" />
-                        </button>
-                    </nav>
+                    {view !== 'admin' && (
+                        <nav className="p-5 sm:p-6 flex justify-between items-center w-full max-w-md mx-auto shrink-0 z-20">
+                            <div className="flex items-center gap-3">
+                                <div className="w-9 h-9 sm:w-10 sm:h-10 bg-emerald-500 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-500/20"><Icon name="zap" className="text-black w-5 h-5 sm:w-6 sm:h-6 fill-current" /></div>
+                                <span className="font-black italic text-xl sm:text-2xl uppercase tracking-tighter leading-none font-outfit text-white drop-shadow-md">MR. <span className="text-emerald-500 text-2xl sm:text-3xl">WASH</span></span>
+                            </div>
+                            <button onClick={() => setIsTestMode(!isTestMode)} className={`p-2.5 rounded-xl border transition-all duration-300 ${isTestMode ? 'bg-orange-500 text-black border-orange-400' : 'bg-white/5 border-white/10 text-white/20 hover:bg-white/10'}`}>
+                                <Icon name="beaker" className="w-5 h-5" />
+                            </button>
+                        </nav>
+                    )}
 
                     <div className="main-content">
                         {view === 'auth' && <AuthView plate={plate} setPlate={setPlate} phone={phone} setPhone={setPhone} handleLogin={handleLogin} loading={loading} />}
                         {view === 'dashboard' && <DashboardView plate={plate} boxId={boxId} boxStatus={boxStatus} userStats={userStats} hasStampInCurrentSession={hasStampInCurrentSession} sessionProgress={sessionProgress} pamperCount={pamperCount} isTestMode={isTestMode} simulateToken={simulateToken} simulateFullCard={simulateFullCard} setView={setView} onRedeemGift={handleRedeemGift} loading={loading} />}
                         {view === 'success' && <SuccessView boxId={boxId} onComplete={() => { setSessionStartTime(Date.now()); refreshStats(plate); setView('dashboard'); }} />}
+                        {view === 'admin' && <AdminView setView={setView} />}
                     </div>
 
-                    <footer className="py-6 flex flex-col items-center gap-2 mt-auto shrink-0 z-20 relative">
-                        <div className="flex items-center gap-6 text-[8px] font-black uppercase tracking-[0.3em] text-white/20 font-outfit">
-                            <span className="legal-link">Termeni și Condiții</span>
-                            <span className="w-1 h-1 bg-white/5 rounded-full"></span>
-                            <span className="legal-link">Politica GDPR</span>
-                            <span className="w-1 h-1 bg-white/5 rounded-full"></span>
-                            <span onClick={() => setView('auth')} className="legal-link hover:text-emerald-500 transition-colors">Admin Portal</span>
-                        </div>
-                        <div className="opacity-[0.05] text-[9px] font-black tracking-[1.5em] uppercase pointer-events-none font-outfit mt-2">
-                            PWS ELITE SYSTEM • BALȘ
-                        </div>
-                    </footer>
+                    {view !== 'admin' && (
+                        <footer className="py-6 flex flex-col items-center gap-2 mt-auto shrink-0 z-20 relative">
+                            <div className="flex items-center gap-6 text-[8px] font-black uppercase tracking-[0.3em] text-white/20 font-outfit">
+                                <span className="legal-link">Termeni și Condiții</span>
+                                <span className="w-1 h-1 bg-white/5 rounded-full"></span>
+                                <span className="legal-link">Politica GDPR</span>
+                                <span className="w-1 h-1 bg-white/5 rounded-full"></span>
+                                <span onClick={() => setView('auth')} className="legal-link hover:text-emerald-500 transition-colors">Admin Portal</span>
+                            </div>
+                            <div className="opacity-[0.05] text-[9px] font-black tracking-[1.5em] uppercase pointer-events-none font-outfit mt-2">
+                                PWS ELITE SYSTEM • BALȘ
+                            </div>
+                        </footer>
+                    )}
                 </div>
             );
         }
