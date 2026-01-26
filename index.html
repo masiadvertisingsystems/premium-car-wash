@@ -268,8 +268,37 @@
             </div>
         );
 
-        const DashboardView = ({ plate, boxId, boxStatus, userStats, hasStampInSession, sessionProgress, isTestMode, simulateToken, simulateFullCard, setView, onRedeemGift, loading }) => {
+        const DashboardView = ({ plate, boxId, boxStatus, userStats, hasStampInCurrentSession, sessionProgress, isTestMode, simulateToken, simulateFullCard, setView, onRedeemGift, loading }) => {
             const [showRedeemModal, setShowRedeemModal] = useState(false);
+
+            const getLoyaltyPersuasionText = () => {
+                if (sessionProgress === 0) {
+                    const prefixes = [
+                        "BINE AI VENIT! ",
+                        "VIZITA NR. 2! ",
+                        "ESTI LA JUMĂTATE! ",
+                        "ULTIMUL PAS! "
+                    ];
+                    const prefix = prefixes[userStats.visits] || "";
+                    return (
+                        <React.Fragment>
+                            {prefix}INTRODU MINIM 4 JETOANE <br />
+                            <span className="text-emerald-500">PENTRU A BIFA ȘTAMPILA.</span>
+                        </React.Fragment>
+                    );
+                } else {
+                    const tokenFeedback = ["", "EXCELENT! ", "BRAVO! ", "SUPER! "];
+                    return (
+                        <React.Fragment>
+                            {tokenFeedback[sessionProgress] || ""}
+                            MAI INTRODU <span className="text-emerald-500">
+                                {TOKENS_PER_STAMP - sessionProgress} {TOKENS_PER_STAMP - sessionProgress === 1 ? 'JETON' : 'JETOANE'}
+                            </span> <br />
+                            PENTRU A BIFA ȘTAMPILA.
+                        </React.Fragment>
+                    );
+                }
+            };
 
             return (
                 <div className="flex flex-col gap-4 animate-in zoom-in-95 duration-500 h-full max-h-full">
@@ -343,7 +372,7 @@
                                         </div>
                                     </div>
                                 </div>
-                            ) : hasStampInSession ? (
+                            ) : hasStampInCurrentSession ? (
                                 <div className="text-center space-y-4 py-4 animate-in zoom-in-90 duration-700">
                                     <div className="w-16 h-16 bg-emerald-500 rounded-[30px] flex items-center justify-center shadow-3xl shadow-emerald-500/30 mx-auto">
                                         <Icon name="shield-check" className="text-black w-10 h-10" />
@@ -355,22 +384,7 @@
                                 <React.Fragment>
                                     <div className="command-panel shrink-0">
                                         <p className="text-[24px] font-black text-white leading-[1.05] font-outfit uppercase tracking-tighter italic">
-                                            {sessionProgress === 0 ? (
-                                                <React.Fragment>
-                                                    INTRODU MINIM 4 JETOANE <br />
-                                                    <span className="text-emerald-500">PENTRU A BIFA ȘTAMPILA.</span>
-                                                </React.Fragment>
-                                            ) : (
-                                                <React.Fragment>
-                                                    {sessionProgress === 1 ? 'EXCELENT! ' : 
-                                                     sessionProgress === 2 ? 'BRAVO! ' : 
-                                                     sessionProgress === 3 ? 'SUPER! ' : ''}
-                                                    MAI INTRODU <span className="text-emerald-500">
-                                                        {4 - sessionProgress} {4 - sessionProgress === 1 ? 'JETON' : 'JETOANE'}
-                                                    </span> <br />
-                                                    PENTRU A BIFA ȘTAMPILA.
-                                                </React.Fragment>
-                                            )}
+                                            {getLoyaltyPersuasionText()}
                                         </p>
                                     </div>
                                     
@@ -437,9 +451,10 @@
             const [boxStatus, setBoxStatus] = useState('...');
             const [userStats, setUserStats] = useState({ visits: 0, nextIsFree: false });
             const [sessionProgress, setSessionProgress] = useState(0);
-            const [hasStampInSession, setHasStampInSession] = useState(false);
+            const [hasStampInCurrentSession, setHasStampInCurrentSession] = useState(false);
             const [isTestMode, setIsTestMode] = useState(false);
             const [loading, setLoading] = useState(false);
+            const [sessionStartTime, setSessionStartTime] = useState(Date.now());
             const isProcessingToken = useRef(false);
 
             const refreshStats = async (targetPlate) => {
@@ -455,9 +470,7 @@
                     }));
                     
                     const redeemDocs = allDocs.filter(d => d.reward_redeemed === true);
-                    const lastRedeemTime = redeemDocs.length > 0 
-                        ? Math.max(...redeemDocs.map(d => d.ts)) 
-                        : 0;
+                    const lastRedeemTime = redeemDocs.length > 0 ? Math.max(...redeemDocs.map(d => d.ts)) : 0;
                     
                     const stamps = allDocs.filter(d => 
                         d.type === 'visit_stamp' && 
@@ -469,26 +482,19 @@
                     const sortedStamps = stamps.sort((a,b) => b.ts - a.ts);
                     const lastStampTime = sortedStamps[0]?.ts || lastRedeemTime;
                     
-                    const count = stamps.length;
-                    const sessionWindow = isTestMode ? 20000 : 1800000;
-                    
-                    setHasStampInSession(stamps.some(d => (Date.now() - d.ts) < sessionWindow));
+                    // CRITIC: Verificăm dacă Ion a obținut ștampila în ACEASTĂ sesiune de utilizare a app-ului
+                    const hasJustFinishedStamp = stamps.some(d => d.ts > sessionStartTime);
+                    setHasStampInCurrentSession(hasJustFinishedStamp);
                     
                     const progress = allDocs.filter(d => 
                         d.type === 'extra_token_log' && 
                         d.ts > lastStampTime && 
-                        (Date.now() - d.ts) < sessionWindow
+                        (Date.now() - d.ts) < (isTestMode ? 20000 : 1800000)
                     ).length;
 
                     setSessionProgress(progress);
-                    setUserStats({ 
-                        visits: count % 5, 
-                        nextIsFree: (count % 5) === 4 
-                    });
-
-                } catch (err) {
-                    console.error("Refresh Error:", err);
-                }
+                    setUserStats({ visits: stamps.length % 5, nextIsFree: (stamps.length % 5) === 4 });
+                } catch (err) { console.error("Refresh Error:", err); }
             };
 
             useEffect(() => {
@@ -498,6 +504,7 @@
                             const ts = snap.val() || Date.now();
                             setBoxStatus(Math.abs(Date.now() - ts) < 65000 ? 'Online' : 'Offline');
                         });
+                        if (plate) refreshStats(plate);
                     } else signInAnonymously(auth);
                 });
                 return () => unsubscribe();
@@ -512,7 +519,7 @@
                         isProcessingToken.current = true;
                         try {
                             const cleanPlate = plate.toUpperCase().replace(/\s/g, '');
-                            const isCompletingStamp = (sessionProgress + 1 >= TOKENS_PER_STAMP && !hasStampInSession);
+                            const isCompletingStamp = (sessionProgress + 1 >= TOKENS_PER_STAMP && !hasStampInCurrentSession);
                             
                             await set(tokensRef, 0); 
                             await addDoc(collection(db, 'artifacts', appId, 'public', 'data', COLLECTION_NAME), {
@@ -524,16 +531,21 @@
                         } finally { isProcessingToken.current = false; }
                     }
                 });
-            }, [view, plate, sessionProgress, hasStampInSession, boxId]);
+            }, [view, plate, sessionProgress, hasStampInCurrentSession, boxId]);
 
             const handleLogin = (e) => {
                 if (e) e.preventDefault();
                 setLoading(true);
-                setView('dashboard');
-                refreshStats(plate);
-                localStorage.setItem('pws_plate', plate);
+                const now = Date.now();
+                setSessionStartTime(now); // RESETĂM TIMPUL SESIUNII LA LOGIN
+                const cleanPlate = plate.toUpperCase().replace(/\s/g, '');
+                localStorage.setItem('pws_plate', cleanPlate);
                 localStorage.setItem('pws_phone', phone);
-                setTimeout(() => setLoading(false), 800);
+                
+                refreshStats(cleanPlate).then(() => {
+                    setView('dashboard');
+                    setLoading(false);
+                });
             };
 
             const simulateToken = (count) => {
@@ -561,26 +573,20 @@
                 setLoading(true);
                 try {
                     const cleanPlate = plate.toUpperCase().replace(/\s/g, '');
-                    
                     await set(ref(rtdb, `artifacts/${appId}/public/data/control/${boxId}/inject_tokens`), 4);
-                    
                     await addDoc(collection(db, 'artifacts', appId, 'public', 'data', COLLECTION_NAME), {
                         numarInmatriculare: cleanPlate, phone, timestamp: serverTimestamp(),
                         status: "completed", type: "visit_stamp", reward_redeemed: true, box: boxId
                     });
-                    
                     setUserStats({ visits: 0, nextIsFree: false });
                     setSessionProgress(0);
-
-                    setTimeout(() => { 
-                        setView('success'); 
-                        setLoading(false); 
-                    }, 1000);
+                    setTimeout(() => { setView('success'); setLoading(false); }, 1000);
                 } catch (e) { setLoading(false); }
             };
 
             const backToDashboard = () => {
                 const cleanPlate = plate.toUpperCase().replace(/\s/g, '');
+                setSessionStartTime(Date.now()); // Resetăm și aici pentru a vedea "Bine ai revenit"
                 refreshStats(cleanPlate); 
                 setView('dashboard');
             };
@@ -602,15 +608,15 @@
                             <AuthView plate={plate} setPlate={setPlate} phone={phone} setPhone={setPhone} handleLogin={handleLogin} loading={loading} />
                         )}
                         {view === 'dashboard' && (
-                            <DashboardView plate={plate} boxId={boxId} boxStatus={boxStatus} userStats={userStats} hasStampInSession={hasStampInSession} sessionProgress={sessionProgress} isTestMode={isTestMode} simulateToken={simulateToken} simulateFullCard={simulateFullCard} setView={setView} onRedeemGift={handleRedeemGift} loading={loading} />
+                            <DashboardView plate={plate} boxId={boxId} boxStatus={boxStatus} userStats={userStats} hasStampInCurrentSession={hasStampInCurrentSession} sessionProgress={sessionProgress} isTestMode={isTestMode} simulateToken={simulateToken} simulateFullCard={simulateFullCard} setView={setView} onRedeemGift={handleRedeemGift} loading={loading} />
                         )}
                         {view === 'success' && (
                             <SuccessView boxId={boxId} onComplete={backToDashboard} />
                         )}
                     </div>
 
-                    <footer className="py-6 text-center opacity-5 italic uppercase text-[10px] font-black tracking-[1em] shrink-0 font-outfit text-white mt-auto">
-                        MR. WASH • ELITE DIVISION
+                    <footer className="py-12 text-center opacity-10 pointer-events-none italic font-black uppercase text-[12px] tracking-[0.8em] mt-auto font-outfit">
+                        MR. WASH • BALȘ DIVISION
                     </footer>
                 </div>
             );
