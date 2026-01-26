@@ -10,15 +10,17 @@
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800;900&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
     <style>
         :root {
             --emerald: #10b981;
-            --emerald-deep: #064e3b;
-            --emerald-glow: rgba(16, 185, 129, 0.4);
-            --surface: #0a0a0a;
+            --emerald-dim: #059669;
+            --emerald-deep: #022c22;
+            --emerald-glow: rgba(16, 185, 129, 0.3);
+            --surface: #09090b;
             --border: rgba(255, 255, 255, 0.08);
+            --glass: rgba(20, 20, 20, 0.7);
         }
 
         * {
@@ -28,12 +30,13 @@
             user-select: none;
             margin: 0;
             padding: 0;
+            -webkit-tap-highlight-color: transparent;
         }
 
         html, body {
             height: 100dvh;
             background-color: #000;
-            overflow: hidden; /* Blocare totală scroll */
+            overflow: hidden;
             font-family: 'Plus Jakarta Sans', sans-serif;
             color: #fff;
             position: fixed;
@@ -44,7 +47,7 @@
             height: 100dvh;
             display: flex;
             flex-direction: column;
-            background: radial-gradient(circle at 50% -25%, var(--emerald-deep) 0%, #000 85%);
+            background: radial-gradient(circle at 50% -20%, #064e3b 0%, #022c22 45%, #000000 90%);
             overflow: hidden;
             padding-top: env(safe-area-inset-top);
             padding-bottom: env(safe-area-inset-bottom);
@@ -54,63 +57,93 @@
             flex: 1;
             display: flex;
             flex-direction: column;
+            justify-content: center;
             width: 100%;
             max-width: 420px;
             margin: 0 auto;
             overflow: hidden;
-            padding: 0 16px;
+            padding: 0 20px;
+            position: relative;
+            z-index: 10;
         }
 
         .glass-card {
-            background: rgba(15, 15, 15, 0.85);
-            backdrop-filter: blur(35px);
+            background: var(--glass);
+            backdrop-filter: blur(40px);
+            -webkit-backdrop-filter: blur(40px);
             border: 1px solid var(--border);
-            box-shadow: 0 40px 100px -20px rgba(0, 0, 0, 0.9);
+            box-shadow: 
+                0 25px 50px -12px rgba(0, 0, 0, 0.9), 
+                inset 0 1px 0 rgba(255, 255, 255, 0.1);
             display: flex;
             flex-direction: column;
-            flex: 1;
-            margin: 5px 0;
+            width: 100%;
+            border-radius: 44px;
             overflow: hidden;
-            transition: all 0.4s ease;
+            transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.4s ease;
+        }
+
+        .premium-input {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            color: #fff;
+        }
+        
+        .premium-input:focus {
+            background: rgba(255, 255, 255, 0.06);
+            border-color: rgba(16, 185, 129, 0.5);
+            box-shadow: 0 0 20px rgba(16, 185, 129, 0.1);
+        }
+
+        .premium-input::placeholder {
+            color: rgba(255, 255, 255, 0.15);
+            font-weight: 500;
+        }
+
+        .checkbox-wrapper input:checked + div {
+            background-color: var(--emerald);
+            border-color: var(--emerald);
+            box-shadow: 0 0 15px var(--emerald-glow);
+        }
+        .checkbox-wrapper input:checked + div svg {
+            stroke-dashoffset: 0;
+        }
+        
+        .checkbox-wrapper:active div {
+            transform: scale(0.9);
         }
 
         .stamp-seal {
-            width: clamp(42px, 10vw, 52px);
-            height: clamp(42px, 10vw, 52px);
+            width: clamp(44px, 11vw, 54px);
+            height: clamp(44px, 11vw, 54px);
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
             position: relative;
-            transition: all 0.7s cubic-bezier(0.19, 1, 0.22, 1);
+            transition: all 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
             flex-shrink: 0;
         }
 
         .stamp-seal-empty {
             background: rgba(255, 255, 255, 0.02);
-            border: 1px solid rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.06);
         }
 
         .stamp-seal-active {
             background: var(--emerald);
-            border: 4px double rgba(0, 0, 0, 0.15);
-            box-shadow: 0 0 30px var(--emerald-glow), inset 0 0 15px rgba(0,0,0,0.2);
-            transform: scale(1.08) rotate(-8deg);
+            border: 3px double rgba(0, 0, 0, 0.2);
+            box-shadow: 0 4px 20px var(--emerald-glow), inset 0 2px 5px rgba(255,255,255,0.4);
+            transform: scale(1.05) rotate(-5deg);
         }
-
-        @keyframes stamp-target-pulse {
-            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); border-color: rgba(255,255,255,0.1); }
-            50% { transform: scale(1.1); box-shadow: 0 0 25px var(--emerald-glow); border-color: var(--emerald); }
-            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); border-color: rgba(255,255,255,0.1); }
-        }
-        .stamp-pulse { animation: stamp-target-pulse 2.5s infinite ease-in-out; }
 
         .gift-seal {
-            width: clamp(50px, 12vw, 60px);
-            height: clamp(50px, 12vw, 60px);
-            border-radius: 18px;
-            border: 1px solid rgba(16, 185, 129, 0.2);
-            background: rgba(16, 185, 129, 0.03);
+            width: clamp(52px, 13vw, 64px);
+            height: clamp(52px, 13vw, 64px);
+            border-radius: 20px;
+            border: 1px solid rgba(16, 185, 129, 0.15);
+            background: rgba(16, 185, 129, 0.02);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -121,76 +154,50 @@
         .gift-seal-active {
             background: #fff;
             border-color: #fff;
-            box-shadow: 0 0 40px rgba(255, 255, 255, 0.25);
-            transform: scale(1.1);
+            box-shadow: 0 0 30px rgba(255, 255, 255, 0.3);
+            transform: scale(1.05);
             color: #000;
-        }
-
-        .command-panel {
-            background: rgba(16, 185, 129, 0.03);
-            border: 1px solid rgba(16, 185, 129, 0.15);
-            padding: clamp(15px, 3vh, 24px) 20px;
-            border-radius: 35px;
-            text-align: center;
-            flex-shrink: 1;
-            min-height: 0;
-        }
-
-        .reward-ready-panel {
-            background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(16, 185, 129, 0.02) 100%);
-            border: 1px solid var(--emerald);
-            box-shadow: 0 0 40px rgba(16, 185, 129, 0.1);
         }
 
         .font-outfit { font-family: 'Outfit', sans-serif; }
 
         .token-count {
-            font-size: clamp(1.8rem, 5vw, 2.2rem);
-            font-weight: 900;
+            font-size: clamp(2rem, 6vw, 2.5rem);
+            font-weight: 800;
             line-height: 1;
-            background: linear-gradient(180deg, #fff 40%, #777 100%);
+            background: linear-gradient(180deg, #fff 30%, #9ca3af 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             font-family: 'Outfit', sans-serif;
-            font-style: italic;
+            letter-spacing: -0.02em;
         }
 
-        .premium-input {
-            background: #080808;
-            border: 1px solid rgba(255, 255, 255, 0.05);
-            transition: all 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
-            color: #fff;
+        .legal-link {
+            transition: color 0.3s ease;
+            cursor: pointer;
+            pointer-events: auto;
         }
+        .legal-link:hover { color: var(--emerald); }
 
         .hide-scrollbar::-webkit-scrollbar { display: none; }
-        
-        .debug-panel {
-            background: rgba(249, 115, 22, 0.08);
-            border: 1px solid rgba(249, 115, 22, 0.3);
-            padding: 12px;
-            border-radius: 28px;
-            margin-top: 5px;
-            flex-shrink: 0;
+
+        @keyframes subtle-pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.85; transform: scale(0.98); }
         }
+        .animate-subtle-pulse { animation: subtle-pulse 3s infinite ease-in-out; }
 
         .modal-overlay {
-            background: rgba(0, 0, 0, 0.95);
-            backdrop-filter: blur(15px);
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(20px);
             position: fixed;
             inset: 0;
             z-index: 100;
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 20px;
+            padding: 24px;
         }
-
-        .legal-link {
-            transition: all 0.3s ease;
-            cursor: pointer;
-            pointer-events: auto;
-        }
-        .legal-link:hover { color: #fff; }
     </style>
 </head>
 <body>
@@ -221,7 +228,7 @@
 
         const appId = 'premium-car-wash'; 
         const COLLECTION_NAME = 'loyalty';
-        const TOKENS_PER_STAMP = 4;
+        const TOKENS_PER_STAMP = 4; 
         const DEFAULT_BOX_ID = "OLT_BOX_01"; 
 
         const Icon = ({ name, className }) => {
@@ -238,100 +245,169 @@
         const SuccessView = ({ boxId, onComplete }) => (
             <div className="flex flex-col items-center justify-center min-h-[60dvh] gap-8 text-center animate-in fade-in zoom-in-95 duration-700 px-6">
                 <div className="relative shrink-0">
-                    <div className="w-36 h-36 bg-emerald-500 rounded-[48px] flex items-center justify-center shadow-[0_0_60px_rgba(16,185,129,0.3)] relative z-10">
-                        <Icon name="zap" className="text-black w-16 h-16 fill-current" />
+                    <div className="w-40 h-40 bg-emerald-500 rounded-[50px] flex items-center justify-center shadow-[0_0_80px_rgba(16,185,129,0.4)] relative z-10 animate-subtle-pulse">
+                        <Icon name="zap" className="text-black w-20 h-20 fill-current" />
                     </div>
                 </div>
                 
                 <div className="space-y-4">
-                    <h2 className="text-[48px] font-black italic uppercase tracking-tighter leading-[0.85] font-outfit">
-                        SPĂLARE <br/><span className="text-emerald-500 text-[54px]">PORNITĂ!</span>
+                    <h2 className="text-[42px] sm:text-[48px] font-black italic uppercase tracking-tighter leading-[0.9] font-outfit">
+                        SPĂLARE <br/><span className="text-emerald-500 text-[50px] sm:text-[56px]">PORNITĂ!</span>
                     </h2>
-                    <p className="text-emerald-500 font-black uppercase text-[14px] tracking-[0.2em] italic font-outfit">
+                    <p className="text-emerald-400 font-bold uppercase text-[13px] tracking-[0.25em] font-outfit opacity-80">
                         SPOR LA TREABĂ!
                     </p>
                 </div>
 
-                <button onClick={onComplete} className="px-10 py-6 bg-white text-black rounded-full text-[13px] font-black uppercase tracking-[0.3em] font-outfit shadow-2xl active:scale-95 transition-all">
+                <button onClick={onComplete} className="px-12 py-5 bg-white text-black rounded-full text-[12px] font-black uppercase tracking-[0.25em] font-outfit shadow-xl hover:shadow-2xl hover:scale-105 active:scale-95 transition-all duration-300">
                     ÎNAPOI LA CARD
                 </button>
             </div>
         );
 
-        const AuthView = ({ plate, setPlate, phone, setPhone, handleLogin, loading }) => (
-            <div className="flex flex-col gap-8 py-4 animate-in fade-in duration-1000 flex-1 justify-center">
-                <div className="space-y-4 text-center">
-                    <h1 className="text-[54px] font-black italic tracking-tighter uppercase leading-[0.85] text-white font-outfit">
-                        A 5-A SPĂLARE <br /> <span className="text-emerald-500 text-6xl">E GRATIS</span>
-                    </h1>
-                </div>
-                
-                <form onSubmit={handleLogin} className="space-y-4">
-                    <div className="space-y-3">
-                        <input required placeholder="NR. ÎNMATRICULARE" className="w-full premium-input rounded-[28px] py-6 px-8 text-2xl font-black tracking-widest outline-none uppercase font-outfit placeholder:text-white/5" value={plate} onChange={e => setPlate(e.target.value)} />
-                        <input required type="tel" placeholder="TELEFON" className="w-full premium-input rounded-[28px] py-6 px-8 text-2xl font-black outline-none font-outfit placeholder:text-white/5" value={phone} onChange={e => setPhone(e.target.value)} />
+        const AuthView = ({ plate, setPlate, phone, setPhone, handleLogin, loading }) => {
+            const [gdprAccepted, setGdprAccepted] = useState(false);
+
+            return (
+                <div className="flex flex-col w-full h-full justify-center animate-in fade-in duration-700">
+                    <div className="flex flex-col gap-8 sm:gap-12">
+                        <div className="text-center space-y-3">
+                            <h1 className="text-[40px] sm:text-[52px] font-black italic tracking-tighter uppercase leading-[0.9] text-emerald-500 font-outfit drop-shadow-2xl">
+                                AI O SPĂLARE <br/> <span className="text-white">GRATUITĂ!</span>
+                            </h1>
+                            <div className="flex items-center justify-center gap-3 opacity-60">
+                                <div className="h-px w-8 bg-gradient-to-r from-transparent to-white/50"></div>
+                                <p className="text-[10px] sm:text-[11px] font-bold text-white uppercase tracking-[0.2em] font-outfit whitespace-nowrap">
+                                    După 4 spălări înregistrate
+                                </p>
+                                <div className="h-px w-8 bg-gradient-to-l from-transparent to-white/50"></div>
+                            </div>
+                        </div>
+                        
+                        <form onSubmit={(e) => { e.preventDefault(); if(gdprAccepted) handleLogin(e); }} className="space-y-6">
+                            <div className="space-y-4">
+                                <div className="relative group">
+                                    <div className="absolute left-6 top-1/2 -translate-y-1/2 text-white/30 group-focus-within:text-emerald-400 transition-colors duration-300">
+                                        <Icon name="car-front" className="w-5 h-5" />
+                                    </div>
+                                    <input 
+                                        required 
+                                        placeholder="NR. ÎNMATRICULARE" 
+                                        className="w-full premium-input rounded-[24px] py-5 pl-14 pr-6 text-xl sm:text-2xl font-black tracking-widest outline-none uppercase font-outfit shadow-lg" 
+                                        value={plate} 
+                                        onChange={e => setPlate(e.target.value)} 
+                                    />
+                                </div>
+                                
+                                <div className="relative group">
+                                    <div className="absolute left-6 top-1/2 -translate-y-1/2 text-white/30 group-focus-within:text-emerald-400 transition-colors duration-300">
+                                        <Icon name="smartphone" className="w-5 h-5" />
+                                    </div>
+                                    <input 
+                                        required 
+                                        type="tel" 
+                                        placeholder="TELEFON" 
+                                        className="w-full premium-input rounded-[24px] py-5 pl-14 pr-6 text-xl sm:text-2xl font-black outline-none font-outfit tracking-wider shadow-lg" 
+                                        value={phone} 
+                                        onChange={e => setPhone(e.target.value)} 
+                                    />
+                                </div>
+                            </div>
+
+                            <div 
+                                className="flex items-center justify-center gap-3 checkbox-wrapper cursor-pointer py-2 hover:opacity-80 transition-opacity" 
+                                onClick={() => setGdprAccepted(!gdprAccepted)}
+                            >
+                                <input type="checkbox" className="hidden" checked={gdprAccepted} readOnly />
+                                <div className={`w-5 h-5 rounded-[6px] border-2 border-white/10 flex items-center justify-center transition-all duration-300 ${gdprAccepted ? 'bg-emerald-500 border-emerald-500 scale-110' : 'bg-transparent'}`}>
+                                    <svg className={`w-3.5 h-3.5 text-black stroke-[3] transition-all duration-300 ${gdprAccepted ? 'opacity-100 scale-100' : 'opacity-0 scale-50'}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
+                                        <polyline points="20 6 9 17 4 12"></polyline>
+                                    </svg>
+                                </div>
+                                <span className={`text-[10px] font-semibold uppercase tracking-wider font-outfit select-none transition-colors duration-300 ${gdprAccepted ? 'text-white' : 'text-white/40'}`}>
+                                    Sunt de acord cu prelucrarea datelor (GDPR)
+                                </span>
+                            </div>
+
+                            <button 
+                                type="submit" 
+                                disabled={loading || !gdprAccepted} 
+                                className={`w-full py-6 rounded-[28px] font-black uppercase text-[14px] sm:text-[15px] tracking-[0.3em] transition-all duration-300 font-outfit mt-2 border border-transparent
+                                ${!gdprAccepted 
+                                    ? 'bg-white/5 text-white/10 cursor-not-allowed border-white/5' 
+                                    : 'bg-white text-black shadow-[0_0_30px_rgba(255,255,255,0.15)] hover:shadow-[0_0_40px_rgba(255,255,255,0.25)] hover:scale-[1.02] active:scale-[0.98]'}`}
+                            >
+                                {loading ? 'SE VERIFICĂ...' : 'DESCHIDE CARDUL'}
+                            </button>
+                        </form>
                     </div>
-                    <button type="submit" disabled={loading} className="w-full bg-white text-black py-7 rounded-[32px] font-black uppercase text-[15px] tracking-[0.4em] active:scale-95 transition-all font-outfit shadow-2xl">
-                        DESCHIDE CARDUL
-                    </button>
-                </form>
-            </div>
-        );
+                </div>
+            );
+        };
 
         const DashboardView = ({ plate, boxId, boxStatus, userStats, hasStampInCurrentSession, sessionProgress, isTestMode, simulateToken, simulateFullCard, setView, onRedeemGift, loading }) => {
             const [showRedeemModal, setShowRedeemModal] = useState(false);
 
             const getLoyaltyPersuasionText = () => {
                 if (sessionProgress === 0) {
-                    const prefixes = ["BINE AI VENIT!", "VIZITA NR. 2!", "ESTI LA JUMĂTATE!", "ULTIMUL PAS!"];
+                    const prefixes = ["BINE AI VENIT!", "VIZITA NR. 2!", "EȘTI LA JUMĂTATE!", "ULTIMUL PAS!"];
                     const prefix = prefixes[userStats.visits] || "";
                     return (
-                        <React.Fragment>
-                            <span className="block text-white/20 text-[10px] tracking-widest mb-1">{prefix}</span>
-                            INTRODU MINIM 4 JETOANE <br />
-                            <span className="text-emerald-500">PENTRU ȘTAMPILĂ</span>
-                        </React.Fragment>
+                        <div className="flex flex-col gap-1">
+                            <span className="text-white/30 text-[9px] font-bold tracking-[0.2em]">{prefix}</span>
+                            <span>INTRODU MINIM 4 JETOANE</span>
+                            <span className="text-emerald-400">PENTRU VALIDARE SPĂLARE</span>
+                        </div>
                     );
                 } else {
                     const tokenFeedback = ["", "EXCELENT!", "BRAVO!", "SUPER!"];
                     return (
-                        <React.Fragment>
-                            <span className="block text-emerald-500/40 text-[10px] tracking-widest mb-1 animate-pulse">{tokenFeedback[sessionProgress]}</span>
-                            MAI INTRODU <span className="text-emerald-500">
-                                {TOKENS_PER_STAMP - sessionProgress} {TOKENS_PER_STAMP - sessionProgress === 1 ? 'JETON' : 'JETOANE'}
-                            </span> <br />
-                            PENTRU ȘTAMPILĂ
-                        </React.Fragment>
+                        <div className="flex flex-col gap-1">
+                            <span className="text-emerald-500 text-[9px] font-bold tracking-[0.2em] animate-pulse">{tokenFeedback[sessionProgress]}</span>
+                            <span>MAI INTRODU <span className="text-emerald-400">{TOKENS_PER_STAMP - sessionProgress} {TOKENS_PER_STAMP - sessionProgress === 1 ? 'JETON' : 'JETOANE'}</span></span>
+                            <span>PENTRU VALIDARE SPĂLARE</span>
+                        </div>
                     );
                 }
             };
 
             return (
-                <div className="flex flex-col gap-2 animate-in zoom-in-95 duration-500 h-full overflow-hidden">
+                <div className="flex flex-col gap-4 animate-in zoom-in-95 duration-500 h-full overflow-hidden justify-center py-2">
                     {showRedeemModal && (
-                        <div className="modal-overlay">
-                            <div className="bg-zinc-950 border border-white/10 p-10 rounded-[50px] w-full max-w-xs space-y-8 text-center shadow-2xl">
-                                <Icon name="gift" className="text-emerald-500 w-16 h-16 mx-auto animate-bounce" />
-                                <h3 className="text-2xl font-black italic uppercase font-outfit tracking-tighter">DEBLOCHEZI?</h3>
-                                <button onClick={() => { setShowRedeemModal(false); onRedeemGift(); }} className="w-full py-6 bg-emerald-500 text-black font-black uppercase text-sm tracking-widest rounded-3xl font-outfit active:scale-95">DA, ACTIVEAZĂ</button>
-                                <button onClick={() => setShowRedeemModal(false)} className="w-full py-3 text-white/20 font-black uppercase text-[10px] font-outfit">Anulează</button>
+                        <div className="modal-overlay animate-in fade-in duration-200">
+                            <div className="glass-card p-8 w-full max-w-xs space-y-6 text-center shadow-2xl border-white/10 bg-[#09090b]">
+                                <div className="w-20 h-20 mx-auto bg-emerald-500/10 rounded-full flex items-center justify-center mb-2">
+                                    <Icon name="gift" className="text-emerald-500 w-10 h-10 animate-bounce" />
+                                </div>
+                                <div className="space-y-2">
+                                    <h3 className="text-2xl font-black italic uppercase font-outfit tracking-tighter text-white">DEBLOCHEZI?</h3>
+                                    <p className="text-white/40 text-xs font-medium leading-relaxed">Activează acum spălarea gratuită la boxa {boxId}.</p>
+                                </div>
+                                <div className="space-y-3 pt-2">
+                                    <button onClick={() => { setShowRedeemModal(false); onRedeemGift(); }} className="w-full py-5 bg-emerald-500 text-black font-black uppercase text-xs tracking-[0.2em] rounded-2xl font-outfit active:scale-95 hover:bg-emerald-400 transition-colors">DA, ACTIVEAZĂ</button>
+                                    <button onClick={() => setShowRedeemModal(false)} className="w-full py-3 text-white/30 font-bold uppercase text-[10px] tracking-widest font-outfit hover:text-white transition-colors">RENUNȚĂ</button>
+                                </div>
                             </div>
                         </div>
                     )}
 
-                    <div className={`glass-card rounded-[50px] ${isTestMode ? 'p-6 gap-3' : 'p-8 gap-6'}`}>
+                    <div className={`glass-card ${isTestMode ? 'p-5 gap-4' : 'p-7 gap-6'} relative overflow-hidden`}>
+                        <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/10 blur-[80px] -z-10 pointer-events-none"></div>
+
                         <div className="flex items-center justify-between shrink-0">
                             <div className="text-left leading-none">
-                                <h3 className="text-3xl font-black italic tracking-tighter uppercase font-outfit text-white">{plate.toUpperCase()}</h3>
-                                <div className="flex items-center gap-2 mt-2">
-                                    <div className={`w-1.5 h-1.5 rounded-full ${boxStatus === 'Online' ? 'bg-emerald-500 shadow-[0_0_12px_#10b981]' : 'bg-red-600'}`} />
-                                    <p className="text-[9px] font-bold text-white/20 uppercase tracking-[0.3em] font-outfit italic leading-none">{boxId} • {boxStatus}</p>
+                                <h3 className="text-[28px] sm:text-[32px] font-black italic tracking-tighter uppercase font-outfit text-white drop-shadow-lg">{plate.toUpperCase()}</h3>
+                                <div className="flex items-center gap-2 mt-2.5">
+                                    <div className={`w-1.5 h-1.5 rounded-full ${boxStatus === 'Online' ? 'bg-emerald-500 shadow-[0_0_8px_#10b981]' : 'bg-red-600'}`} />
+                                    <p className="text-[9px] font-bold text-white/30 uppercase tracking-[0.2em] font-outfit italic leading-none">{boxId} • {boxStatus}</p>
                                 </div>
                             </div>
-                            <div className="w-12 h-12 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center shrink-0"><Icon name="crown" className="text-emerald-500 w-7 h-7" /></div>
+                            <div className="w-12 h-12 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center shrink-0 shadow-inner backdrop-blur-sm">
+                                <Icon name="crown" className="text-emerald-500 w-6 h-6 fill-current/20" />
+                            </div>
                         </div>
 
-                        <div className="flex justify-center items-center gap-3 shrink-0">
+                        <div className="flex justify-center items-center gap-2 sm:gap-3 shrink-0 py-2">
                             {[...Array(5)].map((_, i) => {
                                 const isCollected = i < userStats.visits;
                                 const isCurrentTarget = i === userStats.visits;
@@ -339,52 +415,69 @@
                                     <div key={i} className={`
                                         ${i < 4 ? 'stamp-seal' : 'gift-seal'} 
                                         ${isCollected ? 'stamp-seal-active' : 'stamp-seal-empty'}
-                                        ${isCurrentTarget && !userStats.nextIsFree ? 'stamp-pulse' : ''}
-                                        ${i === 4 && userStats.nextIsFree ? 'gift-seal-active stamp-pulse' : ''}
+                                        ${isCurrentTarget && !userStats.nextIsFree ? 'animate-subtle-pulse border-emerald-500/30' : ''}
+                                        ${i === 4 && userStats.nextIsFree ? 'gift-seal-active animate-subtle-pulse' : ''}
                                     `}>
-                                        {isCollected ? <Icon name="check" className="text-black w-6 h-6 stroke-[4]" /> : (i === 4 ? <Icon name="gift" className={`w-7 h-7 ${userStats.nextIsFree ? 'text-black' : 'text-emerald-500/10'}`} /> : <span className="text-white/5 font-black text-xl italic font-outfit leading-none">{i + 1}</span>)}
+                                        {isCollected ? <Icon name="check" className="text-black w-5 h-5 sm:w-6 sm:h-6 stroke-[4]" /> : (i === 4 ? <Icon name="gift" className={`w-6 h-6 sm:w-7 sm:h-7 ${userStats.nextIsFree ? 'text-black' : 'text-emerald-500/20'}`} /> : <span className="text-white/10 font-black text-lg sm:text-xl italic font-outfit leading-none">{i + 1}</span>)}
                                     </div>
                                 );
                             })}
                         </div>
 
-                        <div className="flex-1 flex flex-col gap-4 min-h-0 justify-center">
+                        <div className="flex-1 flex flex-col gap-4 min-h-0 justify-center relative z-10">
                             {userStats.nextIsFree ? (
-                                <div className="command-panel reward-ready-panel py-6">
-                                    <Icon name="gift" className="text-emerald-500 w-10 h-10 mx-auto mb-2" />
-                                    <p className="text-[24px] font-black text-white leading-none font-outfit uppercase tracking-tighter italic">SPĂLARE GRATUITĂ <br/><span className="text-emerald-500">ACTIVĂ PE CARD</span></p>
+                                <div className="flex flex-col items-center justify-center py-6 animate-in zoom-in duration-500 relative">
+                                    {/* Glow behind text instead of icon */}
+                                    <div className="absolute inset-0 bg-emerald-500/10 blur-[60px] rounded-full pointer-events-none"></div>
+                                    
+                                    <div className="text-center space-y-4 z-10">
+                                        <p className="text-[12px] font-bold text-emerald-500 uppercase tracking-[0.5em] font-outfit animate-pulse">FELICITĂRI!</p>
+                                        <h3 className="text-[42px] sm:text-[48px] font-black text-white leading-[0.85] font-outfit uppercase tracking-tighter italic drop-shadow-2xl animate-subtle-pulse">
+                                            SPĂLARE <br/> <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-emerald-600">GRATUITĂ</span>
+                                        </h3>
+                                        <p className="text-[11px] text-white/40 font-medium uppercase tracking-[0.2em] font-outfit pt-2">
+                                            Disponibilă la boxa {boxId}
+                                        </p>
+                                    </div>
                                 </div>
                             ) : hasStampInCurrentSession ? (
-                                <div className="text-center space-y-2">
-                                    <Icon name="shield-check" className="text-emerald-500 w-10 h-10 mx-auto" />
-                                    <h4 className="text-xl font-black italic uppercase text-white font-outfit leading-none tracking-tight">VIZITĂ VALIDATĂ</h4>
+                                <div className="text-center space-y-3 py-4">
+                                    <div className="w-14 h-14 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto border border-emerald-500/20">
+                                        <Icon name="shield-check" className="text-emerald-500 w-7 h-7" />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <h4 className="text-lg font-black italic uppercase text-white font-outfit leading-none tracking-wide">SPĂLARE VALIDATĂ</h4>
+                                        <p className="text-emerald-500 font-bold uppercase text-[10px] tracking-[0.2em] font-outfit opacity-80">SPOR LA TREABĂ!</p>
+                                    </div>
                                 </div>
                             ) : (
                                 <React.Fragment>
                                     <div className="command-panel">
-                                        <p className="text-[22px] font-black text-white leading-[1.05] font-outfit uppercase tracking-tighter italic">
+                                        <div className="text-[18px] sm:text-[20px] font-black text-white leading-[1.1] font-outfit uppercase tracking-tight italic">
                                             {getLoyaltyPersuasionText()}
-                                        </p>
+                                        </div>
                                     </div>
                                     
-                                    <div className="flex items-center justify-between px-6 shrink-0">
-                                        <span className="text-[9px] font-bold uppercase tracking-widest italic text-white/20">Monitorizare live</span>
+                                    <div className="flex items-center justify-between px-6 py-2 shrink-0 bg-white/5 rounded-3xl border border-white/5">
+                                        <span className="text-[9px] font-bold uppercase tracking-widest italic text-white/30 flex items-center gap-2">
+                                            <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></div> Monitorizare
+                                        </span>
                                         <div className="token-count text-white">
-                                            {sessionProgress}<span className="text-xs opacity-20 not-italic ml-2 uppercase">fise</span>
+                                            {sessionProgress}<span className="text-xs opacity-30 not-italic ml-1.5 uppercase font-bold tracking-wider">fise</span>
                                         </div>
                                     </div>
                                 </React.Fragment>
                             )}
 
                             {isTestMode && (
-                                <div className="debug-panel animate-in slide-in-from-bottom duration-300">
-                                    <div className="flex items-center justify-center gap-1 mb-2">
+                                <div className="debug-panel animate-in slide-in-from-bottom duration-300 bg-orange-500/5 border-orange-500/20">
+                                    <div className="flex items-center justify-center gap-1.5 mb-2">
                                         <Icon name="beaker" className="text-orange-500 w-3 h-3" />
-                                        <p className="text-[8px] font-black uppercase text-orange-500 tracking-widest italic leading-none">Debug Control</p>
+                                        <p className="text-[8px] font-black uppercase text-orange-500 tracking-widest italic leading-none">Debug Mode</p>
                                     </div>
                                     <div className="flex gap-2">
-                                        <button onClick={() => simulateToken(1)} className="flex-1 py-3 bg-orange-500/10 border border-orange-500/20 text-orange-400 rounded-xl font-black uppercase text-[9px] tracking-widest font-outfit active:scale-95 transition-all">+1 JETON</button>
-                                        <button onClick={simulateFullCard} disabled={loading} className="flex-1 py-3 bg-orange-500/20 border border-orange-500/40 text-orange-400 rounded-xl font-black uppercase text-[9px] tracking-widest font-outfit active:scale-95 transition-all">FULL (4/4)</button>
+                                        <button onClick={() => simulateToken(1)} className="flex-1 py-3 bg-orange-500/10 border border-orange-500/20 text-orange-400 rounded-xl font-black uppercase text-[9px] tracking-widest font-outfit active:scale-95 transition-all hover:bg-orange-500/20">+1 JETON</button>
+                                        <button onClick={simulateFullCard} disabled={loading} className="flex-1 py-3 bg-orange-500/20 border border-orange-500/40 text-orange-400 rounded-xl font-black uppercase text-[9px] tracking-widest font-outfit active:scale-95 transition-all hover:bg-orange-500/30">FULL (4/4)</button>
                                     </div>
                                 </div>
                             )}
@@ -392,15 +485,19 @@
 
                         <div className="shrink-0 pt-2">
                             {userStats.nextIsFree ? (
-                                <button onClick={() => setShowRedeemModal(true)} disabled={loading} className="w-full py-7 bg-emerald-500 text-black rounded-[35px] font-black uppercase text-[15px] tracking-[0.4em] shadow-2xl shadow-emerald-500/40 animate-pulse font-outfit active:scale-95">ACTIVEAZĂ ACUM</button>
+                                <button onClick={() => setShowRedeemModal(true)} disabled={loading} className="w-full py-6 bg-emerald-500 text-black rounded-[28px] font-black uppercase text-[14px] tracking-[0.3em] shadow-[0_0_30px_rgba(16,185,129,0.4)] animate-subtle-pulse font-outfit active:scale-95 hover:bg-emerald-400 transition-colors">ACTIVEAZĂ ACUM</button>
                             ) : (
-                                <div className="w-full py-5 bg-white/5 border border-white/5 rounded-[30px] flex items-center justify-center gap-3">
-                                    <Icon name="lock" className="w-4 h-4 text-white/10" />
-                                    <span className="text-[11px] font-bold uppercase italic text-white/20 tracking-[0.1em] font-outfit">Încă {4 - userStats.visits} vizite până la cadou</span>
+                                <div className="w-full py-5 bg-white/5 border border-white/5 rounded-[28px] flex items-center justify-center gap-3">
+                                    <Icon name="lock" className="w-4 h-4 text-white/20" />
+                                    <span className="text-[11px] font-bold uppercase italic text-white/30 tracking-[0.1em] font-outfit">A 5-a spălare GRATUITĂ</span>
                                 </div>
                             )}
                         </div>
                     </div>
+                    
+                    <button onClick={() => setView('auth')} className="w-full py-4 text-[10px] font-bold text-white/20 uppercase tracking-[0.4em] flex items-center justify-center gap-2 hover:text-white transition-colors italic font-outfit shrink-0 group">
+                        <Icon name="refresh-cw" className="w-3.5 h-3.5 opacity-40 group-hover:opacity-100 transition-opacity" /> Logout • Schimbă
+                    </button>
                 </div>
             );
         };
@@ -441,7 +538,8 @@
             useEffect(() => {
                 const unsubscribe = onAuthStateChanged(auth, (u) => {
                     if (u) {
-                        onValue(ref(rtdb, `artifacts/${appId}/public/data/logs/${boxId}/last_action`), (snap) => {
+                        const logsPath = `artifacts/${appId}/public/data/logs/${boxId}/last_action`;
+                        onValue(ref(rtdb, logsPath), (snap) => {
                             const ts = snap.val() || Date.now();
                             setBoxStatus(Math.abs(Date.now() - ts) < 65000 ? 'Online' : 'Offline');
                         });
@@ -514,12 +612,12 @@
 
             return (
                 <div className="app-container">
-                    <nav className="p-6 flex justify-between items-center w-full max-w-md mx-auto shrink-0 z-20">
+                    <nav className="p-5 sm:p-6 flex justify-between items-center w-full max-w-md mx-auto shrink-0 z-20">
                         <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-emerald-500 rounded-2xl flex items-center justify-center shadow-lg"><Icon name="zap" className="text-black w-6 h-6 fill-current" /></div>
-                            <span className="font-black italic text-2xl uppercase tracking-tighter leading-none font-outfit text-white">MR. <span className="text-emerald-500 text-3xl">WASH</span></span>
+                            <div className="w-9 h-9 sm:w-10 sm:h-10 bg-emerald-500 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-500/20"><Icon name="zap" className="text-black w-5 h-5 sm:w-6 sm:h-6 fill-current" /></div>
+                            <span className="font-black italic text-xl sm:text-2xl uppercase tracking-tighter leading-none font-outfit text-white drop-shadow-md">MR. <span className="text-emerald-500 text-2xl sm:text-3xl">WASH</span></span>
                         </div>
-                        <button onClick={() => setIsTestMode(!isTestMode)} className={`p-2.5 rounded-xl border transition-all ${isTestMode ? 'bg-orange-500 text-black border-orange-400' : 'bg-white/5 border-white/10 text-white/10'}`}>
+                        <button onClick={() => setIsTestMode(!isTestMode)} className={`p-2.5 rounded-xl border transition-all duration-300 ${isTestMode ? 'bg-orange-500 text-black border-orange-400' : 'bg-white/5 border-white/10 text-white/20 hover:bg-white/10'}`}>
                             <Icon name="beaker" className="w-5 h-5" />
                         </button>
                     </nav>
@@ -536,9 +634,9 @@
                             <span className="w-1 h-1 bg-white/5 rounded-full"></span>
                             <span className="legal-link">Politica GDPR</span>
                             <span className="w-1 h-1 bg-white/5 rounded-full"></span>
-                            <span onClick={() => setView('auth')} className="legal-link hover:text-emerald-500">Admin Portal</span>
+                            <span onClick={() => setView('auth')} className="legal-link hover:text-emerald-500 transition-colors">Admin Portal</span>
                         </div>
-                        <div className="opacity-[0.03] text-[9px] font-black tracking-[1.5em] uppercase pointer-events-none font-outfit">
+                        <div className="opacity-[0.05] text-[9px] font-black tracking-[1.5em] uppercase pointer-events-none font-outfit mt-2">
                             PWS ELITE SYSTEM • BALȘ
                         </div>
                     </footer>
