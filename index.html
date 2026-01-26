@@ -57,12 +57,11 @@
             flex: 1;
             display: flex;
             flex-direction: column;
-            justify-content: center;
             width: 100%;
             max-width: 420px;
             margin: 0 auto;
             overflow: hidden;
-            padding: 0 20px;
+            padding: 16px 20px;
             position: relative;
             z-index: 10;
         }
@@ -78,7 +77,8 @@
             display: flex;
             flex-direction: column;
             width: 100%;
-            border-radius: 44px;
+            height: 100%;
+            border-radius: 40px;
             overflow: hidden;
             transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.4s ease;
         }
@@ -115,8 +115,8 @@
         }
 
         .stamp-seal {
-            width: clamp(44px, 11vw, 54px);
-            height: clamp(44px, 11vw, 54px);
+            width: clamp(40px, 10vw, 54px);
+            height: clamp(40px, 10vw, 54px);
             border-radius: 50%;
             display: flex;
             align-items: center;
@@ -139,8 +139,8 @@
         }
 
         .gift-seal {
-            width: clamp(52px, 13vw, 64px);
-            height: clamp(52px, 13vw, 64px);
+            width: clamp(48px, 12vw, 64px);
+            height: clamp(48px, 12vw, 64px);
             border-radius: 20px;
             border: 1px solid rgba(16, 185, 129, 0.15);
             background: rgba(16, 185, 129, 0.02);
@@ -229,6 +229,7 @@
         const appId = 'premium-car-wash'; 
         const COLLECTION_NAME = 'loyalty';
         const TOKENS_PER_STAMP = 4; 
+        const SESSION_TIMEOUT = 30 * 60 * 1000; 
         const DEFAULT_BOX_ID = "OLT_BOX_01"; 
 
         const Icon = ({ name, className }) => {
@@ -345,7 +346,7 @@
             );
         };
 
-        const DashboardView = ({ plate, boxId, boxStatus, userStats, hasStampInCurrentSession, sessionProgress, isTestMode, simulateToken, simulateFullCard, setView, onRedeemGift, loading }) => {
+        const DashboardView = ({ plate, boxId, boxStatus, userStats, hasStampInCurrentSession, sessionProgress, pamperCount, isTestMode, simulateToken, simulateFullCard, setView, onRedeemGift, loading }) => {
             const [showRedeemModal, setShowRedeemModal] = useState(false);
 
             const getLoyaltyPersuasionText = () => {
@@ -372,10 +373,10 @@
             };
 
             return (
-                <div className="flex flex-col gap-4 animate-in zoom-in-95 duration-500 h-full overflow-hidden justify-center py-2">
+                <div className="h-full flex flex-col animate-in zoom-in-95 duration-500">
                     {showRedeemModal && (
                         <div className="modal-overlay animate-in fade-in duration-200">
-                            <div className="glass-card p-8 w-full max-w-xs space-y-6 text-center shadow-2xl border-white/10 bg-[#09090b]">
+                            <div className="glass-card p-8 w-full max-w-xs space-y-6 text-center shadow-2xl border-white/10 bg-[#09090b] flex flex-col justify-center h-auto">
                                 <div className="w-20 h-20 mx-auto bg-emerald-500/10 rounded-full flex items-center justify-center mb-2">
                                     <Icon name="gift" className="text-emerald-500 w-10 h-10 animate-bounce" />
                                 </div>
@@ -391,74 +392,82 @@
                         </div>
                     )}
 
-                    <div className={`glass-card ${isTestMode ? 'p-5 gap-4' : 'p-7 gap-6'} relative overflow-hidden`}>
+                    <div className={`glass-card ${isTestMode ? 'p-5' : 'p-7'} relative overflow-hidden flex flex-col justify-between`}>
                         <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/10 blur-[80px] -z-10 pointer-events-none"></div>
 
-                        <div className="flex items-center justify-between shrink-0">
-                            <div className="text-left leading-none">
-                                <h3 className="text-[28px] sm:text-[32px] font-black italic tracking-tighter uppercase font-outfit text-white drop-shadow-lg">{plate.toUpperCase()}</h3>
-                                <div className="flex items-center gap-2 mt-2.5">
-                                    <div className={`w-1.5 h-1.5 rounded-full ${boxStatus === 'Online' ? 'bg-emerald-500 shadow-[0_0_8px_#10b981]' : 'bg-red-600'}`} />
-                                    <p className="text-[9px] font-bold text-white/30 uppercase tracking-[0.2em] font-outfit italic leading-none">{boxId} • {boxStatus}</p>
+                        <div className="flex-none space-y-6">
+                            <div className="flex items-center justify-between shrink-0">
+                                <div className="text-left leading-none">
+                                    <h3 className="text-[28px] sm:text-[32px] font-black italic tracking-tighter uppercase font-outfit text-white drop-shadow-lg">{plate.toUpperCase()}</h3>
+                                    <div className="flex items-center gap-2 mt-2.5">
+                                        <div className={`w-1.5 h-1.5 rounded-full ${boxStatus === 'Online' ? 'bg-emerald-500 shadow-[0_0_8px_#10b981]' : 'bg-red-600'}`} />
+                                        <p className="text-[9px] font-bold text-white/30 uppercase tracking-[0.2em] font-outfit italic leading-none">{boxId} • {boxStatus}</p>
+                                    </div>
+                                </div>
+                                <div className="w-12 h-12 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center shrink-0 shadow-inner backdrop-blur-sm">
+                                    <Icon name="crown" className="text-emerald-500 w-6 h-6 fill-current/20" />
                                 </div>
                             </div>
-                            <div className="w-12 h-12 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center shrink-0 shadow-inner backdrop-blur-sm">
-                                <Icon name="crown" className="text-emerald-500 w-6 h-6 fill-current/20" />
+
+                            <div className="flex justify-center items-center gap-2 sm:gap-3 shrink-0">
+                                {[...Array(5)].map((_, i) => {
+                                    const isCollected = i < userStats.visits;
+                                    const isCurrentTarget = i === userStats.visits;
+                                    return (
+                                        <div key={i} className={`
+                                            ${i < 4 ? 'stamp-seal' : 'gift-seal'} 
+                                            ${isCollected ? 'stamp-seal-active' : 'stamp-seal-empty'}
+                                            ${isCurrentTarget && !userStats.nextIsFree ? 'animate-subtle-pulse border-emerald-500/30' : ''}
+                                            ${i === 4 && userStats.nextIsFree ? 'gift-seal-active animate-subtle-pulse' : ''}
+                                        `}>
+                                            {isCollected ? <Icon name="check" className="text-black w-5 h-5 sm:w-6 sm:h-6 stroke-[4]" /> : (i === 4 ? <Icon name="gift" className={`w-6 h-6 sm:w-7 sm:h-7 ${userStats.nextIsFree ? 'text-black' : 'text-emerald-500/20'}`} /> : <span className="text-white/10 font-black text-lg sm:text-xl italic font-outfit leading-none">{i + 1}</span>)}
+                                        </div>
+                                    );
+                                })}
                             </div>
                         </div>
 
-                        <div className="flex justify-center items-center gap-2 sm:gap-3 shrink-0 py-2">
-                            {[...Array(5)].map((_, i) => {
-                                const isCollected = i < userStats.visits;
-                                const isCurrentTarget = i === userStats.visits;
-                                return (
-                                    <div key={i} className={`
-                                        ${i < 4 ? 'stamp-seal' : 'gift-seal'} 
-                                        ${isCollected ? 'stamp-seal-active' : 'stamp-seal-empty'}
-                                        ${isCurrentTarget && !userStats.nextIsFree ? 'animate-subtle-pulse border-emerald-500/30' : ''}
-                                        ${i === 4 && userStats.nextIsFree ? 'gift-seal-active animate-subtle-pulse' : ''}
-                                    `}>
-                                        {isCollected ? <Icon name="check" className="text-black w-5 h-5 sm:w-6 sm:h-6 stroke-[4]" /> : (i === 4 ? <Icon name="gift" className={`w-6 h-6 sm:w-7 sm:h-7 ${userStats.nextIsFree ? 'text-black' : 'text-emerald-500/20'}`} /> : <span className="text-white/10 font-black text-lg sm:text-xl italic font-outfit leading-none">{i + 1}</span>)}
-                                    </div>
-                                );
-                            })}
-                        </div>
-
-                        <div className="flex-1 flex flex-col gap-4 min-h-0 justify-center relative z-10">
+                        <div className="flex-1 flex flex-col justify-center items-center min-h-0 relative z-10 px-2">
                             {userStats.nextIsFree ? (
-                                <div className="flex flex-col items-center justify-center py-6 animate-in zoom-in duration-500 relative">
-                                    {/* Glow behind text instead of icon */}
+                                <div className="w-full flex flex-col items-center justify-center gap-2 animate-in zoom-in duration-500 relative">
                                     <div className="absolute inset-0 bg-emerald-500/10 blur-[60px] rounded-full pointer-events-none"></div>
                                     
-                                    <div className="text-center space-y-4 z-10">
-                                        <p className="text-[12px] font-bold text-emerald-500 uppercase tracking-[0.5em] font-outfit animate-pulse">FELICITĂRI!</p>
-                                        <h3 className="text-[42px] sm:text-[48px] font-black text-white leading-[0.85] font-outfit uppercase tracking-tighter italic drop-shadow-2xl animate-subtle-pulse">
+                                    <div className="text-center space-y-1 z-10">
+                                        <p className="text-[10px] sm:text-[12px] font-bold text-emerald-500 uppercase tracking-[0.5em] font-outfit animate-pulse">FELICITĂRI!</p>
+                                        <h3 className="font-black text-white leading-[0.85] font-outfit uppercase tracking-tighter italic drop-shadow-2xl animate-subtle-pulse" style={{ fontSize: 'clamp(2.5rem, 8vw, 3.8rem)' }}>
                                             SPĂLARE <br/> <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-emerald-600">GRATUITĂ</span>
                                         </h3>
-                                        <p className="text-[11px] text-white/40 font-medium uppercase tracking-[0.2em] font-outfit pt-2">
+                                        <p className="text-[9px] sm:text-[11px] text-white/40 font-medium uppercase tracking-[0.2em] font-outfit pt-1">
                                             Disponibilă la boxa {boxId}
                                         </p>
                                     </div>
                                 </div>
                             ) : hasStampInCurrentSession ? (
-                                <div className="text-center space-y-3 py-4">
+                                <div className="text-center space-y-4">
                                     <div className="w-14 h-14 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto border border-emerald-500/20">
                                         <Icon name="shield-check" className="text-emerald-500 w-7 h-7" />
                                     </div>
-                                    <div className="space-y-1">
-                                        <h4 className="text-lg font-black italic uppercase text-white font-outfit leading-none tracking-wide">SPĂLARE VALIDATĂ</h4>
-                                        <p className="text-emerald-500 font-bold uppercase text-[10px] tracking-[0.2em] font-outfit opacity-80">SPOR LA TREABĂ!</p>
+                                    <div className="space-y-3">
+                                        <h4 className="text-[28px] font-black italic uppercase text-white font-outfit leading-none tracking-tight">SPĂLARE VALIDATĂ</h4>
+                                        {pamperCount > 0 ? (
+                                            <p className="text-emerald-400 font-bold uppercase text-[11px] tracking-[0.15em] font-outfit animate-pulse px-4 leading-relaxed">
+                                                ORICE JETON ÎN PLUS ESTE RĂSFĂȚ PENTRU MAȘINA TA! <br/>
+                                                <span className="text-white/60 text-[9px] tracking-[0.2em] mt-1 block">SPOR LA TREABĂ!</span>
+                                            </p>
+                                        ) : (
+                                            <p className="text-emerald-500 font-bold uppercase text-[11px] tracking-[0.2em] font-outfit opacity-80">SPOR LA TREABĂ!</p>
+                                        )}
                                     </div>
                                 </div>
                             ) : (
                                 <React.Fragment>
-                                    <div className="command-panel">
+                                    <div className="command-panel w-full">
                                         <div className="text-[18px] sm:text-[20px] font-black text-white leading-[1.1] font-outfit uppercase tracking-tight italic">
                                             {getLoyaltyPersuasionText()}
                                         </div>
                                     </div>
                                     
-                                    <div className="flex items-center justify-between px-6 py-2 shrink-0 bg-white/5 rounded-3xl border border-white/5">
+                                    <div className="flex items-center justify-between px-6 py-2 shrink-0 bg-white/5 rounded-3xl border border-white/5 mt-4 w-full">
                                         <span className="text-[9px] font-bold uppercase tracking-widest italic text-white/30 flex items-center gap-2">
                                             <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></div> Monitorizare
                                         </span>
@@ -470,7 +479,7 @@
                             )}
 
                             {isTestMode && (
-                                <div className="debug-panel animate-in slide-in-from-bottom duration-300 bg-orange-500/5 border-orange-500/20">
+                                <div className="debug-panel animate-in slide-in-from-bottom duration-300 bg-orange-500/5 border-orange-500/20 w-full mt-4">
                                     <div className="flex items-center justify-center gap-1.5 mb-2">
                                         <Icon name="beaker" className="text-orange-500 w-3 h-3" />
                                         <p className="text-[8px] font-black uppercase text-orange-500 tracking-widest italic leading-none">Debug Mode</p>
@@ -483,7 +492,7 @@
                             )}
                         </div>
 
-                        <div className="shrink-0 pt-2">
+                        <div className="flex-none pt-4">
                             {userStats.nextIsFree ? (
                                 <button onClick={() => setShowRedeemModal(true)} disabled={loading} className="w-full py-6 bg-emerald-500 text-black rounded-[28px] font-black uppercase text-[14px] tracking-[0.3em] shadow-[0_0_30px_rgba(16,185,129,0.4)] animate-subtle-pulse font-outfit active:scale-95 hover:bg-emerald-400 transition-colors">ACTIVEAZĂ ACUM</button>
                             ) : (
@@ -495,7 +504,7 @@
                         </div>
                     </div>
                     
-                    <button onClick={() => setView('auth')} className="w-full py-4 text-[10px] font-bold text-white/20 uppercase tracking-[0.4em] flex items-center justify-center gap-2 hover:text-white transition-colors italic font-outfit shrink-0 group">
+                    <button onClick={() => setView('auth')} className="w-full py-4 text-[10px] font-bold text-white/20 uppercase tracking-[0.4em] flex items-center justify-center gap-2 hover:text-white transition-colors italic font-outfit shrink-0 group flex-none">
                         <Icon name="refresh-cw" className="w-3.5 h-3.5 opacity-40 group-hover:opacity-100 transition-opacity" /> Logout • Schimbă
                     </button>
                 </div>
@@ -510,6 +519,7 @@
             const [boxStatus, setBoxStatus] = useState('...');
             const [userStats, setUserStats] = useState({ visits: 0, nextIsFree: false });
             const [sessionProgress, setSessionProgress] = useState(0);
+            const [pamperCount, setPamperCount] = useState(0); // STATE NOU PENTRU RASFAT
             const [hasStampInCurrentSession, setHasStampInCurrentSession] = useState(false);
             const [isTestMode, setIsTestMode] = useState(false);
             const [loading, setLoading] = useState(false);
@@ -529,8 +539,14 @@
                     setHasStampInCurrentSession(stamps.some(d => d.ts > sessionStartTime));
                     const sortedStamps = stamps.sort((a,b) => b.ts - a.ts);
                     const lastStampTime = sortedStamps[0]?.ts || lastRedeemTime;
-                    const progress = allDocs.filter(d => d.type === 'extra_token_log' && d.ts > lastStampTime && (Date.now() - d.ts) < 1800000).length;
+                    
+                    const progress = allDocs.filter(d => d.type === 'extra_token_log' && d.ts > lastStampTime && (Date.now() - d.ts) < SESSION_TIMEOUT).length;
+                    
+                    // Calculam jetoanele de rasfat pentru sesiunea curenta
+                    const currentPamperTokens = allDocs.filter(d => d.type === 'pamper_token' && d.ts > sessionStartTime).length;
+                    
                     setSessionProgress(progress);
+                    setPamperCount(currentPamperTokens);
                     setUserStats({ visits: stamps.length % 5, nextIsFree: (stamps.length % 5) === 4 });
                 } catch (err) { console.error(err); }
             };
@@ -559,10 +575,21 @@
                         try {
                             const cleanPlate = plate.toUpperCase().replace(/\s/g, '');
                             const isCompletingStamp = (sessionProgress + 1 >= TOKENS_PER_STAMP && !hasStampInCurrentSession);
+                            
                             await set(tokensRef, 0); 
+                            
+                            // LOGICA NOUA: Daca avem deja stampila, marcam ca "pamper_token" (jeton de rasfat)
+                            // Altfel, marcam ca progres normal
+                            let tokenType = "extra_token_log";
+                            if (hasStampInCurrentSession) {
+                                tokenType = "pamper_token";
+                            } else if (isCompletingStamp) {
+                                tokenType = "visit_stamp";
+                            }
+
                             await addDoc(collection(db, 'artifacts', appId, 'public', 'data', COLLECTION_NAME), {
                                 numarInmatriculare: cleanPlate, phone, timestamp: serverTimestamp(),
-                                status: "completed", type: isCompletingStamp ? "visit_stamp" : "extra_token_log",
+                                status: "completed", type: tokenType,
                                 box: boxId
                             });
                             refreshStats(cleanPlate);
@@ -624,7 +651,7 @@
 
                     <div className="main-content">
                         {view === 'auth' && <AuthView plate={plate} setPlate={setPlate} phone={phone} setPhone={setPhone} handleLogin={handleLogin} loading={loading} />}
-                        {view === 'dashboard' && <DashboardView plate={plate} boxId={boxId} boxStatus={boxStatus} userStats={userStats} hasStampInCurrentSession={hasStampInCurrentSession} sessionProgress={sessionProgress} isTestMode={isTestMode} simulateToken={simulateToken} simulateFullCard={simulateFullCard} setView={setView} onRedeemGift={handleRedeemGift} loading={loading} />}
+                        {view === 'dashboard' && <DashboardView plate={plate} boxId={boxId} boxStatus={boxStatus} userStats={userStats} hasStampInCurrentSession={hasStampInCurrentSession} sessionProgress={sessionProgress} pamperCount={pamperCount} isTestMode={isTestMode} simulateToken={simulateToken} simulateFullCard={simulateFullCard} setView={setView} onRedeemGift={handleRedeemGift} loading={loading} />}
                         {view === 'success' && <SuccessView boxId={boxId} onComplete={() => { setSessionStartTime(Date.now()); refreshStats(plate); setView('dashboard'); }} />}
                     </div>
 
