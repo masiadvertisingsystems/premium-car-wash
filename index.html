@@ -202,6 +202,52 @@
             justify-content: center;
             padding: 24px;
         }
+
+        /* Redesign Logo ORIZONTAL - ALINIERE PREMIUM */
+        .logo-container {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+        .logo-badge {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            width: 44px;
+            height: 44px;
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            flex-shrink: 0;
+        }
+        .logo-text-group {
+            display: flex;
+            flex-direction: row;
+            align-items: center; /* Aliniere perfectă pe centrul iconiței */
+            gap: 7px;
+        }
+        .logo-mr {
+            font-size: 28px; /* Aceeași dimensiune ca WASH */
+            font-weight: 900;
+            font-style: italic; /* Stil unitar */
+            color: var(--emerald);
+            letter-spacing: -0.02em;
+            font-family: 'Outfit', sans-serif;
+            line-height: 1;
+        }
+        .logo-wash {
+            font-size: 28px;
+            font-weight: 900;
+            font-style: italic;
+            background: linear-gradient(to right, #ffffff 40%, #10b981 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -0.02em;
+            font-family: 'Outfit', sans-serif;
+            line-height: 1;
+            padding-right: 8px; /* Spațiu de siguranță pentru H italic */
+        }
     </style>
 </head>
 <body>
@@ -256,7 +302,7 @@
                 </div>
                 
                 <div className="space-y-4">
-                    <h2 className="text-[42px] sm:text-[48px] font-black italic uppercase tracking-tighter leading-[0.9] font-outfit">
+                    <h2 className="text-[42px] sm:text-[48px] font-black italic uppercase tracking-tighter leading-[1.2] font-outfit">
                         SPĂLARE <br/><span className="text-emerald-500 text-[50px] sm:text-[56px]">PORNITĂ!</span>
                     </h2>
                     <p className="text-emerald-400 font-bold uppercase text-[13px] tracking-[0.25em] font-outfit opacity-80">
@@ -281,7 +327,6 @@
             const [loading, setLoading] = useState(true);
 
             useEffect(() => {
-                // Real-time listener for the last 50 actions
                 const q = query(
                     collection(db, 'artifacts', appId, 'public', 'data', COLLECTION_NAME),
                     orderBy('timestamp', 'desc'),
@@ -292,12 +337,9 @@
                     const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                     setLogs(data);
 
-                    // Basic analytics from the snapshot (in production use aggregation queries)
                     const paid = data.filter(d => d.type === 'visit_stamp').length;
                     const free = data.filter(d => d.reward_redeemed === true).length;
                     const unique = new Set(data.map(d => d.numarInmatriculare)).size;
-                    
-                    // Simple estimate: 1 stamp = 4 tokens * 5 RON (example) = 20 RON per paid visit stamp roughly
                     const estimatedRev = paid * 20; 
 
                     setStats({
@@ -331,7 +373,6 @@
                     </div>
 
                     <div className="flex-1 overflow-hidden flex flex-col p-4 gap-4">
-                        {/* KPI Cards */}
                         <div className="grid grid-cols-2 gap-3 shrink-0">
                             <div className="bg-emerald-900/20 border border-emerald-500/20 p-4 rounded-2xl relative overflow-hidden">
                                 <div className="absolute top-0 right-0 p-3 opacity-20"><Icon name="coins" className="w-8 h-8 text-emerald-500" /></div>
@@ -361,7 +402,6 @@
                             </div>
                         </div>
 
-                        {/* Live Feed */}
                         <div className="flex-1 bg-white/5 border border-white/10 rounded-2xl overflow-hidden flex flex-col">
                             <div className="p-4 border-b border-white/5 flex items-center gap-2">
                                 <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
@@ -403,7 +443,7 @@
                 <div className="flex flex-col w-full h-full justify-center animate-in fade-in duration-700">
                     <div className="flex flex-col gap-8 sm:gap-12">
                         <div className="text-center space-y-3">
-                            <h1 className="text-[40px] sm:text-[52px] font-black italic tracking-tighter uppercase leading-[0.9] text-emerald-500 font-outfit drop-shadow-2xl">
+                            <h1 className="text-[40px] sm:text-[52px] font-black italic tracking-tighter uppercase leading-[1.2] text-emerald-500 font-outfit drop-shadow-2xl">
                                 AI O SPĂLARE <br/> <span className="text-white">GRATUITĂ!</span>
                             </h1>
                             <div className="flex items-center justify-center gap-3 opacity-60">
@@ -527,7 +567,7 @@
                         <div className="flex-none space-y-6">
                             <div className="flex items-center justify-between shrink-0">
                                 <div className="text-left leading-none">
-                                    <h3 className="text-[28px] sm:text-[32px] font-black italic tracking-tighter uppercase font-outfit text-white drop-shadow-lg">{plate.toUpperCase()}</h3>
+                                    <h3 className="text-[28px] sm:text-[32px] font-black italic tracking-tighter uppercase font-outfit text-white drop-shadow-lg leading-[1.2]">{plate.toUpperCase()}</h3>
                                     <div className="flex items-center gap-2 mt-2.5">
                                         <div className={`w-1.5 h-1.5 rounded-full ${boxStatus === 'Online' ? 'bg-emerald-500 shadow-[0_0_8px_#10b981]' : 'bg-red-600'}`} />
                                         <p className="text-[9px] font-bold text-white/30 uppercase tracking-[0.2em] font-outfit italic leading-none">{boxId} • {boxStatus}</p>
@@ -556,14 +596,14 @@
                             </div>
                         </div>
 
-                        <div className="flex-1 flex flex-col justify-center items-center min-h-0 relative z-10 px-2">
+                        <div className="flex-1 flex flex-col justify-center items-center min-h-0 relative z-10 px-2 text-center">
                             {userStats.nextIsFree ? (
                                 <div className="w-full flex flex-col items-center justify-center gap-2 animate-in zoom-in duration-500 relative">
                                     <div className="absolute inset-0 bg-emerald-500/10 blur-[60px] rounded-full pointer-events-none"></div>
                                     
                                     <div className="text-center space-y-1 z-10">
                                         <p className="text-[10px] sm:text-[12px] font-bold text-emerald-500 uppercase tracking-[0.5em] font-outfit animate-pulse">FELICITĂRI!</p>
-                                        <h3 className="font-black text-white leading-[0.85] font-outfit uppercase tracking-tighter italic drop-shadow-2xl animate-subtle-pulse" style={{ fontSize: 'clamp(2.5rem, 8vw, 3.8rem)' }}>
+                                        <h3 className="font-black text-white leading-[1.2] font-outfit uppercase tracking-tighter italic drop-shadow-2xl animate-subtle-pulse" style={{ fontSize: 'clamp(2.5rem, 8vw, 3.8rem)' }}>
                                             SPĂLARE <br/> <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-emerald-600">GRATUITĂ</span>
                                         </h3>
                                         <p className="text-[9px] sm:text-[11px] text-white/40 font-medium uppercase tracking-[0.2em] font-outfit pt-1">
@@ -577,7 +617,7 @@
                                         <Icon name="shield-check" className="text-emerald-500 w-7 h-7" />
                                     </div>
                                     <div className="space-y-3">
-                                        <h4 className="text-[28px] font-black italic uppercase text-white font-outfit leading-none tracking-tight">SPĂLARE VALIDATĂ</h4>
+                                        <h4 className="text-[28px] font-black italic uppercase text-white font-outfit leading-[1.2] tracking-tight">SPĂLARE VALIDATĂ</h4>
                                         {pamperCount > 0 ? (
                                             <p className="text-emerald-400 font-bold uppercase text-[11px] tracking-[0.15em] font-outfit animate-pulse px-4 leading-relaxed">
                                                 ORICE JETON ÎN PLUS ESTE RĂSFĂȚ PENTRU MAȘINA TA! <br/>
@@ -615,7 +655,7 @@
                                     </div>
                                     <div className="flex gap-2">
                                         <button onClick={() => simulateToken(1)} className="flex-1 py-3 bg-orange-500/10 border border-orange-500/20 text-orange-400 rounded-xl font-black uppercase text-[9px] tracking-widest font-outfit active:scale-95 transition-all hover:bg-orange-500/20">+1 JETON</button>
-                                        <button onClick={simulateFullCard} disabled={loading} className="flex-1 py-3 bg-orange-500/20 border border-orange-500/40 text-orange-400 rounded-xl font-black uppercase text-[9px] tracking-widest font-outfit active:scale-95 transition-all hover:bg-orange-500/30">FULL (4/4)</button>
+                                        <button onClick={simulateFullCard} disabled={loading} className="flex-1 py-3 bg-orange-500/10 border border-orange-500/40 text-orange-400 rounded-xl font-black uppercase text-[9px] tracking-widest font-outfit active:scale-95 transition-all hover:bg-orange-500/30">FULL (4/4)</button>
                                     </div>
                                 </div>
                             )}
@@ -670,7 +710,6 @@
                     const lastStampTime = sortedStamps[0]?.ts || lastRedeemTime;
                     
                     const progress = allDocs.filter(d => d.type === 'extra_token_log' && d.ts > lastStampTime && (Date.now() - d.ts) < SESSION_TIMEOUT).length;
-                    
                     const currentPamperTokens = allDocs.filter(d => d.type === 'pamper_token' && d.ts > sessionStartTime).length;
                     
                     setSessionProgress(progress);
@@ -703,7 +742,6 @@
                         try {
                             const cleanPlate = plate.toUpperCase().replace(/\s/g, '');
                             const isCompletingStamp = (sessionProgress + 1 >= TOKENS_PER_STAMP && !hasStampInCurrentSession);
-                            
                             await set(tokensRef, 0); 
                             
                             let tokenType = "extra_token_log";
@@ -727,15 +765,12 @@
             const handleLogin = (e) => {
                 if (e) e.preventDefault();
                 setLoading(true);
-                
                 const cleanPlate = plate.toUpperCase().replace(/\s/g, '');
-                
                 if (cleanPlate === 'ADMIN88') {
                     setView('admin');
                     setLoading(false);
                     return;
                 }
-
                 setSessionStartTime(Date.now()); 
                 localStorage.setItem('pws_plate', cleanPlate);
                 localStorage.setItem('pws_phone', phone);
@@ -775,9 +810,14 @@
                 <div className="app-container">
                     {view !== 'admin' && (
                         <nav className="p-5 sm:p-6 flex justify-between items-center w-full max-w-md mx-auto shrink-0 z-20">
-                            <div className="flex items-center gap-3">
-                                <div className="w-9 h-9 sm:w-10 sm:h-10 bg-emerald-500 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-500/20"><Icon name="zap" className="text-black w-5 h-5 sm:w-6 sm:h-6 fill-current" /></div>
-                                <span className="font-black italic text-xl sm:text-2xl uppercase tracking-tighter leading-none font-outfit text-white drop-shadow-md">MR. <span className="text-emerald-500 text-2xl sm:text-3xl">WASH</span></span>
+                            <div className="logo-container">
+                                <div className="logo-badge">
+                                    <Icon name="zap" className="text-black w-6 h-6 fill-current" />
+                                </div>
+                                <div className="logo-text-group">
+                                    <span className="logo-mr">Mr.</span>
+                                    <span className="logo-wash">WASH</span>
+                                </div>
                             </div>
                             <button onClick={() => setIsTestMode(!isTestMode)} className={`p-2.5 rounded-xl border transition-all duration-300 ${isTestMode ? 'bg-orange-500 text-black border-orange-400' : 'bg-white/5 border-white/10 text-white/20 hover:bg-white/10'}`}>
                                 <Icon name="beaker" className="w-5 h-5" />
